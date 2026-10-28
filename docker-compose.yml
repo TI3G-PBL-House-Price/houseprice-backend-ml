@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: houseprice_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME:-houseprice_db}
+      POSTGRES_USER: ${DB_USER:-houseprice_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-houseprice_secret_pass}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - houseprice-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-houseprice_admin} -d ${DB_NAME:-houseprice_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: houseprice_backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=db
+    volumes:
+      - ./models_artefacts:/app/models_artefacts
+    ports:
+      - "5000:5000"
+    networks:
+      - houseprice-net
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  houseprice-net:
+    driver: bridge

@@ -1,0 +1,3 @@
+[submodule "docs"]
+	path = docs
+	url = https://github.com/TI3G-PBL-House-Price/houseprice-docs.git

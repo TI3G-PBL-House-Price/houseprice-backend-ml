@@ -1,0 +1,27 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Lingkungan Virtual Python
+venv/
+env/
+ENV/
+.venv/
+
+# Environment Variables & Secrets (Kritis)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+instance/
+
+# Basis Data Lokal & Log
+*.sqlite3
+*.log
+
+# Deployment & IDE
+.vscode/
+.idea/
+.DS_Store
