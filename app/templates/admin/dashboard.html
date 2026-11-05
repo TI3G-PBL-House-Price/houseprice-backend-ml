@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Telemetri & Model ML | HousePrice Admin</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        zinc: {
+                            850: '#1e1e24',
+                            900: '#18181b',
+                            950: '#09090b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+    </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col antialiased selection:bg-blue-600 selection:text-white">
+
+    <!-- TOP HEADER -->
+    <header class="bg-zinc-900 border-b border-zinc-800 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-14">
+                <!-- Left: Branding -->
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded bg-zinc-800 border border-zinc-700 flex items-center justify-center text-blue-400 font-bold text-sm">
+                        <i class="fa-solid fa-cube text-xs"></i>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold text-sm text-white tracking-tight">HousePrice</span>
+                        <span class="text-zinc-600">/</span>
+                        <span class="text-xs text-zinc-300 font-mono">ml-admin-console</span>
+                    </div>
+                </div>
+
+                <!-- Middle: Engine Health Pill -->
+                <div class="hidden md:flex items-center space-x-3 text-xs bg-zinc-950 border border-zinc-800 px-3 py-1 rounded-full font-mono">
+                    <span class="flex items-center space-x-1.5 text-emerald-400 font-medium">
+                        <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span>API ONLINE</span>
+                    </span>
+                    <span class="text-zinc-700">|</span>
+                    <span class="text-zinc-400">Model: <strong class="text-zinc-200">{{ active_model.model_name if active_model else 'Random Forest' }} ({{ active_model.version if active_model else 'v1.0.0' }})</strong></span>
+                    <span class="text-zinc-700">|</span>
+                    <span class="text-zinc-400">DB: <span class="text-zinc-300">PostgreSQL 15</span></span>
+                </div>
+
+                <!-- Right: Admin Profile & Logout -->
+                <div class="flex items-center space-x-3">
+                    <div class="text-right hidden sm:block">
+                        <p class="text-xs font-semibold text-zinc-200 leading-none">{{ admin.full_name if admin else 'Abdul Rahman Hanif' }}</p>
+                        <p class="text-[11px] text-zinc-400 font-mono mt-0.5">PM & QA Integration</p>
+                    </div>
+                    <a href="{{ url_for('admin.logout') }}" 
+                       title="Keluar dari Sesi"
+                       class="text-xs text-zinc-400 hover:text-rose-400 bg-zinc-800 hover:bg-zinc-700/80 border border-zinc-700/80 px-2.5 py-1.5 rounded transition flex items-center space-x-1.5">
+                        <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
+                        <span class="hidden sm:inline">Keluar</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTENT WRAPPER -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full space-y-6">
+
+        <!-- FLASH NOTIFICATION -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="rounded-lg p-3.5 text-xs flex items-center justify-between border {% if category == 'success' %}bg-emerald-950/60 border-emerald-800 text-emerald-300{% elif category == 'info' %}bg-blue-950/60 border-blue-800 text-blue-300{% else %}bg-rose-950/60 border-rose-800 text-rose-300{% endif %}">
+                        <div class="flex items-center space-x-2">
+                            <i class="fa-solid {% if category == 'success' %}fa-circle-check{% elif category == 'info' %}fa-circle-info{% else %}fa-circle-exclamation{% endif %} text-sm"></i>
+                            <span class="font-medium">{{ message }}</span>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- PAGE HEADER & ACTION TOOLBAR -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-zinc-800">
+            <div>
+                <h1 class="text-lg font-bold text-white tracking-tight">Konsol Evaluasi & Telemetri Model ML</h1>
+                <p class="text-xs text-zinc-400">Monitoring metrik regresi inferensi harga properti DKI Jakarta dan integrasi REST API</p>
+            </div>
+            <div class="flex items-center space-x-2.5">
+                <form action="{{ url_for('admin.retrain') }}" method="POST">
+                    <button type="submit" class="text-xs bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-700/80 px-3 py-1.5 rounded font-mono font-medium transition flex items-center space-x-1.5">
+                        <i class="fa-solid fa-arrows-rotate text-xs"></i>
+                        <span>Retrain Trigger</span>
+                    </button>
+                </form>
+                <a href="#live-workbench" class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded font-medium transition flex items-center space-x-1.5 shadow-sm">
+                    <i class="fa-solid fa-play text-xs"></i>
+                    <span>Uji Coba Inferensi</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- 4 ESSENTIAL METRIC CARDS -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Card 1: Model R2 -->
+            <div class="bg-zinc-900 rounded-xl p-4 border border-zinc-800 shadow-sm">
+                <div class="flex items-center justify-between text-xs text-zinc-400 font-mono">
+                    <span>R² DETERMINASI</span>
+                    <span class="text-emerald-400 bg-emerald-950/50 border border-emerald-800/80 px-1.5 py-0.5 rounded text-[10px]">PASS ≥ 80%</span>
+                </div>
+                <div class="mt-2.5">
+                    <div class="flex items-baseline space-x-2 font-mono">
+                        <span class="text-2xl font-bold text-white">{{ (active_model.r2_score * 100)|round(2) if active_model else '82.72' }}%</span>
+                        <span class="text-xs text-zinc-400">({{ active_model.r2_score if active_model else '0.8272' }})</span>
+                    </div>
+                    <p class="text-[11px] text-zinc-400 mt-1.5 font-mono">
+                        Algoritma: {{ active_model.model_name if active_model else 'Random Forest' }}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Card 2: MAE -->
+            <div class="bg-zinc-900 rounded-xl p-4 border border-zinc-800 shadow-sm">
+                <div class="flex items-center justify-between text-xs text-zinc-400 font-mono">
+                    <span>MEAN ABSOLUTE ERROR</span>
+                    <span class="text-blue-400 bg-blue-950/50 border border-blue-800/80 px-1.5 py-0.5 rounded text-[10px]">VALIDATION</span>
+                </div>
+                <div class="mt-2.5">
+                    <div class="flex items-baseline space-x-2 font-mono">
+                        <span class="text-xl font-bold text-white">Rp 1,06 Miliar</span>
+                    </div>
+                    <p class="text-[11px] text-zinc-400 mt-1.5 font-mono">
+                        RMSE: Rp 1,81 Miliar
+                    </p>
+                </div>
+            </div>
+
+            <!-- Card 3: Inference Latency -->
+            <div class="bg-zinc-900 rounded-xl p-4 border border-zinc-800 shadow-sm">
+                <div class="flex items-center justify-between text-xs text-zinc-400 font-mono">
+                    <span>LATENSI INFERENSI</span>
+                    <span class="text-emerald-400 bg-emerald-950/50 border border-emerald-800/80 px-1.5 py-0.5 rounded text-[10px]">NFR &lt; 1.5s</span>
+                </div>
+                <div class="mt-2.5">
+                    <div class="flex items-baseline space-x-2 font-mono">
+                        <span class="text-2xl font-bold text-white">{{ avg_latency }} ms</span>
+                        <span class="text-xs text-emerald-400 font-normal">avg server</span>
+                    </div>
+                    <p class="text-[11px] text-zinc-400 mt-1.5 font-mono">
+                        Total Inferensi: {{ total_predictions }} transaksi
+                    </p>
+                </div>
+            </div>
+
+            <!-- Card 4: Dataset & DB Scope -->
+            <div class="bg-zinc-900 rounded-xl p-4 border border-zinc-800 shadow-sm">
+                <div class="flex items-center justify-between text-xs text-zinc-400 font-mono">
+                    <span>DATASET & SCHEMA</span>
+                    <span class="text-indigo-400 bg-indigo-950/50 border border-indigo-800/80 px-1.5 py-0.5 rounded text-[10px]">POSTGRES</span>
+                </div>
+                <div class="mt-2.5">
+                    <div class="flex items-baseline space-x-2 font-mono">
+                        <span class="text-xl font-bold text-white">{{ "{:,}".format(dataset.total_records) if dataset else '10,000' }}</span>
+                        <span class="text-xs text-zinc-400">baris</span>
+                    </div>
+                    <p class="text-[11px] text-zinc-400 mt-1.5 font-mono">
+                        {{ total_locations }} Wilayah • 9 Tabel Relasional
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TWO CHARTS: MODEL BENCHMARK & REGIONAL PRICES -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <!-- Chart 1: ML Model Benchmark -->
+            <div class="bg-zinc-900 rounded-xl p-4 border border-zinc-800 shadow-sm">
+                <div class="flex items-center justify-between mb-3 pb-2 border-b border-zinc-800 text-xs">
+                    <div>
+                        <span class="font-semibold text-zinc-200">Komparasi Akurasi Algoritma Regresi</span>
+                        <p class="text-[11px] text-zinc-400">Perbandingan koefisien determinasi (R² Score) model terlatih</p>
+                    </div>
+                    <span class="text-[10px] text-zinc-400 font-mono bg-zinc-800 px-2 py-0.5 rounded">Scikit-Learn</span>
+                </div>
+                <div class="h-56">
+                    <canvas id="modelChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 2: Regional Property Price Distribution -->
+            <div class="bg-zinc-900 rounded-xl p-4 border border-zinc-800 shadow-sm">
+                <div class="flex items-center justify-between mb-3 pb-2 border-b border-zinc-800 text-xs">
+                    <div>
+                        <span class="font-semibold text-zinc-200">Statistik Harga Properti per Wilayah DKI</span>
+                        <p class="text-[11px] text-zinc-400">Rata-rata nilai transaksi properti per meter persegi (m²)</p>
+                    </div>
+                    <span class="text-[10px] text-zinc-400 font-mono bg-zinc-800 px-2 py-0.5 rounded">Juta Rp / m²</span>
+                </div>
+                <div class="h-56">
+                    <canvas id="priceChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- LIVE INFERENCE WORKBENCH (TEST CONSOLE) -->
+        <div id="live-workbench" class="bg-zinc-900 rounded-xl p-5 border border-zinc-800 shadow-sm">
+            <div class="flex items-center justify-between mb-3 pb-2.5 border-b border-zinc-800">
+                <div class="flex items-center space-x-2.5">
+                    <span class="w-6 h-6 rounded bg-blue-950 border border-blue-800 text-blue-400 flex items-center justify-center text-xs">
+                        <i class="fa-solid fa-terminal"></i>
+                    </span>
+                    <div>
+                        <h2 class="text-xs font-bold text-zinc-100 uppercase tracking-wider font-mono">Uji Coba Inferensi Langsung (Live Workbench)</h2>
+                        <p class="text-[11px] text-zinc-400">Simulasikan masukan form spesifikasi fisik untuk menghasilkan estimasi nilai pasar dan merekam ke PostgreSQL</p>
+                    </div>
+                </div>
+                <span class="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800 px-2 py-0.5 rounded">
+                    Strict Gate Verified
+                </span>
+            </div>
+
+            <form action="{{ url_for('admin.quick_predict') }}" method="POST" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 pt-1">
+                <div class="col-span-2">
+                    <label class="block text-[11px] font-mono text-zinc-400 mb-1">Kota Administrasi</label>
+                    <select name="city" class="w-full text-xs bg-zinc-950 border border-zinc-700/80 rounded px-2.5 py-2 text-zinc-200 focus:outline-none focus:border-blue-500">
+                        <option value="Jakarta Selatan" selected>Jakarta Selatan</option>
+                        <option value="Jakarta Barat">Jakarta Barat</option>
+                        <option value="Jakarta Pusat">Jakarta Pusat</option>
+                        <option value="Jakarta Timur">Jakarta Timur</option>
+                        <option value="Jakarta Utara">Jakarta Utara</option>
+                    </select>
+                </div>
+
+                <div class="col-span-2">
+                    <label class="block text-[11px] font-mono text-zinc-400 mb-1">Kecamatan</label>
+                    <input type="text" name="district" value="Tebet" class="w-full text-xs bg-zinc-950 border border-zinc-700/80 rounded px-2.5 py-2 text-zinc-200 focus:outline-none focus:border-blue-500" required>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-mono text-zinc-400 mb-1">Luas Tanah (m²)</label>
+                    <input type="number" name="surface_area" value="140" min="1" step="any" class="w-full text-xs bg-zinc-950 border border-zinc-700/80 rounded px-2 py-2 text-zinc-200 focus:outline-none focus:border-blue-500 font-mono" required>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-mono text-zinc-400 mb-1">Luas Bangunan (m²)</label>
+                    <input type="number" name="building_area" value="160" min="1" step="any" class="w-full text-xs bg-zinc-950 border border-zinc-700/80 rounded px-2 py-2 text-zinc-200 focus:outline-none focus:border-blue-500 font-mono" required>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-mono text-zinc-400 mb-1">KT / KM / Carport</label>
+                    <div class="grid grid-cols-3 gap-1">
+                        <input type="number" name="bed" value="3" min="0" title="Kamar Tidur" class="w-full text-center text-xs bg-zinc-950 border border-zinc-700/80 rounded py-2 text-zinc-200 font-mono">
+                        <input type="number" name="bath" value="2" min="0" title="Kamar Mandi" class="w-full text-center text-xs bg-zinc-950 border border-zinc-700/80 rounded py-2 text-zinc-200 font-mono">
+                        <input type="number" name="carport" value="2" min="0" title="Carport" class="w-full text-center text-xs bg-zinc-950 border border-zinc-700/80 rounded py-2 text-zinc-200 font-mono">
+                    </div>
+                </div>
+
+                <div class="flex items-end">
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs py-2 px-3 rounded shadow transition flex items-center justify-center space-x-1.5">
+                        <i class="fa-solid fa-calculator text-xs"></i>
+                        <span>Eksekusi</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- DATA TABLES TABBED SYSTEM -->
+        <div class="bg-zinc-900 rounded-xl border border-zinc-800 shadow-sm overflow-hidden">
+            <!-- Tab Headers -->
+            <div class="border-b border-zinc-800 bg-zinc-950/60 px-4 pt-3 flex space-x-4 overflow-x-auto text-xs font-mono">
+                <button onclick="switchTab('predictions')" id="tab-btn-predictions" class="tab-btn pb-2.5 font-semibold border-b-2 border-blue-500 text-blue-400 transition flex items-center space-x-2">
+                    <i class="fa-solid fa-list-ul"></i>
+                    <span>Telemetri Prediksi ({{ total_predictions }})</span>
+                </button>
+                <button onclick="switchTab('models')" id="tab-btn-models" class="tab-btn pb-2.5 font-medium border-b-2 border-transparent text-zinc-400 hover:text-zinc-200 transition flex items-center space-x-2">
+                    <i class="fa-solid fa-server"></i>
+                    <span>Model Registry ({{ models|length }})</span>
+                </button>
+                <button onclick="switchTab('locations')" id="tab-btn-locations" class="tab-btn pb-2.5 font-medium border-b-2 border-transparent text-zinc-400 hover:text-zinc-200 transition flex items-center space-x-2">
+                    <i class="fa-solid fa-map-location-dot"></i>
+                    <span>Statistik Pasar ({{ market_stats|length }})</span>
+                </button>
+                <button onclick="switchTab('audits')" id="tab-btn-audits" class="tab-btn pb-2.5 font-medium border-b-2 border-transparent text-zinc-400 hover:text-zinc-200 transition flex items-center space-x-2">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <span>Audit Trail ({{ audit_logs|length }})</span>
+                </button>
+            </div>
+
+            <!-- TAB 1: Prediction Logs -->
+            <div id="tab-content-predictions" class="tab-content overflow-x-auto p-4">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="text-[11px] uppercase text-zinc-400 border-b border-zinc-800 font-mono">
+                            <th class="pb-2.5 font-medium">Timestamp</th>
+                            <th class="pb-2.5 font-medium">Wilayah</th>
+                            <th class="pb-2.5 font-medium">Parameter Fisik</th>
+                            <th class="pb-2.5 font-medium">Estimasi Model (Rp)</th>
+                            <th class="pb-2.5 font-medium">Versi</th>
+                            <th class="pb-2.5 font-medium">Latensi</th>
+                            <th class="pb-2.5 font-medium">Client IP</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-800/60 font-mono text-zinc-300">
+                        {% for log in prediction_logs %}
+                        <tr class="hover:bg-zinc-800/40 transition">
+                            <td class="py-2.5 text-zinc-400 text-[11px]">{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else '-' }}</td>
+                            <td class="py-2.5 font-sans">
+                                <span class="font-semibold text-zinc-200">{{ log.district }}</span>,
+                                <span class="text-zinc-400 text-[11px]">{{ log.city }}</span>
+                            </td>
+                            <td class="py-2.5 text-[11px]">
+                                LT: {{ log.surface_area }}m² | LB: {{ log.building_area }}m² | {{ log.bed }}KT/{{ log.bath }}KM/{{ log.carport }}C
+                            </td>
+                            <td class="py-2.5 font-bold text-blue-400">
+                                Rp {{ "{:,.2f}".format(log.predicted_price) }}
+                            </td>
+                            <td class="py-2.5">
+                                <span class="text-[10px] bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded text-zinc-300">{{ log.model_version }}</span>
+                            </td>
+                            <td class="py-2.5 text-emerald-400 font-semibold">{{ log.latency_ms }} ms</td>
+                            <td class="py-2.5 text-zinc-400 text-[11px]">{{ log.client_ip or '127.0.0.1' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- TAB 2: Model Registry -->
+            <div id="tab-content-models" class="tab-content overflow-x-auto p-4 hidden">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="text-[11px] uppercase text-zinc-400 border-b border-zinc-800 font-mono">
+                            <th class="pb-2.5 font-medium">Model Name</th>
+                            <th class="pb-2.5 font-medium">Versi</th>
+                            <th class="pb-2.5 font-medium">Algorithm</th>
+                            <th class="pb-2.5 font-medium">R² Score</th>
+                            <th class="pb-2.5 font-medium">MAE (Rupiah)</th>
+                            <th class="pb-2.5 font-medium">RMSE (Rupiah)</th>
+                            <th class="pb-2.5 font-medium">Status Produksi</th>
+                            <th class="pb-2.5 font-medium">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-800/60 font-mono text-zinc-300">
+                        {% for m in models %}
+                        <tr class="hover:bg-zinc-800/40 transition">
+                            <td class="py-3 font-sans font-semibold text-zinc-100">{{ m.model_name }}</td>
+                            <td class="py-3 text-zinc-400 text-[11px]">{{ m.version }}</td>
+                            <td class="py-3 text-zinc-400">{{ m.algorithm_type }}</td>
+                            <td class="py-3 font-bold text-emerald-400">{{ (m.r2_score * 100)|round(2) }}% ({{ m.r2_score }})</td>
+                            <td class="py-3 text-[11px]">Rp {{ "{:,.2f}".format(m.mae_score) }}</td>
+                            <td class="py-3 text-[11px] text-zinc-400">Rp {{ "{:,.2f}".format(m.rmse_score) }}</td>
+                            <td class="py-3">
+                                {% if m.is_active %}
+                                    <span class="inline-flex items-center space-x-1 bg-emerald-950/60 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded text-[10px] font-semibold">
+                                        <i class="fa-solid fa-check text-[9px]"></i>
+                                        <span>ACTIVE INFERENCE</span>
+                                    </span>
+                                {% else %}
+                                    <span class="text-[10px] text-zinc-400 bg-zinc-800 border border-zinc-700 px-2 py-0.5 rounded">STANDBY</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3">
+                                {% if not m.is_active %}
+                                    <form action="{{ url_for('admin.switch_model', model_id=m.id) }}" method="POST">
+                                        <button type="submit" class="text-[11px] bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-600 px-2.5 py-1 rounded transition">
+                                            Aktifkan
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <span class="text-[11px] text-zinc-500 italic">Terpilih</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- TAB 3: Market Statistics -->
+            <div id="tab-content-locations" class="tab-content overflow-x-auto p-4 hidden">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="text-[11px] uppercase text-zinc-400 border-b border-zinc-800 font-mono">
+                            <th class="pb-2.5 font-medium">Kota Administrasi</th>
+                            <th class="pb-2.5 font-medium">Rata-Rata Harga (Rp)</th>
+                            <th class="pb-2.5 font-medium">Rata-Rata Harga / m²</th>
+                            <th class="pb-2.5 font-medium">Rata-Rata Luas Tanah</th>
+                            <th class="pb-2.5 font-medium">Rata-Rata Bangunan</th>
+                            <th class="pb-2.5 font-medium">Sampel Properti</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-800/60 font-mono text-zinc-300">
+                        {% for stat in market_stats %}
+                        <tr class="hover:bg-zinc-800/40 transition">
+                            <td class="py-2.5 font-sans font-semibold text-zinc-100">{{ stat.city }}</td>
+                            <td class="py-2.5 text-blue-400 font-bold">Rp {{ "{:,.2f}".format(stat.avg_price) }}</td>
+                            <td class="py-2.5 text-zinc-300">Rp {{ "{:,.2f}".format(stat.avg_price_per_sqm) }} / m²</td>
+                            <td class="py-2.5 text-zinc-400">{{ stat.avg_surface_area }} m²</td>
+                            <td class="py-2.5 text-zinc-400">{{ stat.avg_building_area }} m²</td>
+                            <td class="py-2.5 text-zinc-200 font-semibold">{{ stat.total_properties }} Unit</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- TAB 4: System Audit Trail -->
+            <div id="tab-content-audits" class="tab-content overflow-x-auto p-4 hidden">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="text-[11px] uppercase text-zinc-400 border-b border-zinc-800 font-mono">
+                            <th class="pb-2.5 font-medium">Waktu</th>
+                            <th class="pb-2.5 font-medium">Action Type</th>
+                            <th class="pb-2.5 font-medium">Modul</th>
+                            <th class="pb-2.5 font-medium">Deskripsi Operasi</th>
+                            <th class="pb-2.5 font-medium">IP Address</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-800/60 font-mono text-zinc-300">
+                        {% for audit in audit_logs %}
+                        <tr class="hover:bg-zinc-800/40 transition">
+                            <td class="py-2.5 text-zinc-400 text-[11px]">{{ audit.created_at.strftime('%Y-%m-%d %H:%M:%S') if audit.created_at else '-' }}</td>
+                            <td class="py-2.5">
+                                <span class="bg-zinc-800 border border-zinc-700 text-blue-400 px-1.5 py-0.5 rounded text-[10px]">{{ audit.action_type }}</span>
+                            </td>
+                            <td class="py-2.5 text-zinc-400">{{ audit.module_name }}</td>
+                            <td class="py-2.5 font-sans text-zinc-200">{{ audit.description }}</td>
+                            <td class="py-2.5 text-zinc-400 text-[11px]">{{ audit.ip_address or '127.0.0.1' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-zinc-900 border-t border-zinc-800 text-zinc-400 text-xs py-4 mt-8 font-mono">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div class="flex items-center space-x-2">
+                <span class="text-zinc-200 font-bold">HousePrice PBL TI-3G</span>
+                <span>•</span>
+                <span>Politeknik Negeri Malang</span>
+            </div>
+            <div class="text-[11px] text-zinc-400">
+                PostgreSQL Schema: 9 Relational Tables • Strict Gate JWT HS256
+            </div>
+        </div>
+    </footer>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('border-blue-500', 'text-blue-400', 'font-semibold');
+                btn.classList.add('border-transparent', 'text-zinc-400', 'font-medium');
+            });
+
+            document.getElementById('tab-content-' + tabName).classList.remove('hidden');
+            const activeBtn = document.getElementById('tab-btn-' + tabName);
+            activeBtn.classList.remove('border-transparent', 'text-zinc-400', 'font-medium');
+            activeBtn.classList.add('border-blue-500', 'text-blue-400', 'font-semibold');
+        }
+
+        // CHART 1: Model Comparison
+        const ctxModel = document.getElementById('modelChart').getContext('2d');
+        new Chart(ctxModel, {
+            type: 'bar',
+            data: {
+                labels: ['Random Forest v1.0.0', 'Multiple Linear Reg v0.9.0'],
+                datasets: [{
+                    label: 'Koefisien Determinasi R² (%)',
+                    data: [82.72, 68.40],
+                    backgroundColor: ['#2563eb', '#52525b'],
+                    borderRadius: 4,
+                    barPercentage: 0.45
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#a1a1aa', font: { family: 'JetBrains Mono', size: 10 } }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        grid: { color: '#27272a' },
+                        ticks: {
+                            color: '#a1a1aa',
+                            font: { family: 'JetBrains Mono', size: 10 },
+                            callback: v => v + '%'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+
+        // CHART 2: Regional Property Price Distribution
+        const ctxPrice = document.getElementById('priceChart').getContext('2d');
+        new Chart(ctxPrice, {
+            type: 'bar',
+            data: {
+                labels: ['JakPus', 'JakSel', 'JakUt', 'JakBar', 'JakTim'],
+                datasets: [{
+                    label: 'Rata-Rata Harga / m² (Juta Rp)',
+                    data: [28.0, 24.5, 21.0, 18.5, 14.2],
+                    backgroundColor: '#3b82f6',
+                    borderRadius: 4,
+                    barPercentage: 0.5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#a1a1aa', font: { family: 'JetBrains Mono', size: 10 } }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#27272a' },
+                        ticks: {
+                            color: '#a1a1aa',
+                            font: { family: 'JetBrains Mono', size: 10 },
+                            callback: v => 'Rp ' + v + 'Jt'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
