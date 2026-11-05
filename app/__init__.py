@@ -1,4 +1,4 @@
-from flask import Flask, redirect, url_for
+from flask import Flask
 from app.config import Config
 from app.extensions import db, bcrypt, migrate, cors
 
@@ -26,10 +26,6 @@ def create_app(config_class=Config):
     app.register_blueprint(predict_bp, url_prefix="/api/v1/predict")
     app.register_blueprint(notifications_bp, url_prefix="/api/v1/notifications")
     app.register_blueprint(admin_bp, url_prefix="/admin")
-
-    @app.route("/", methods=["GET"])
-    def index():
-        return redirect(url_for("admin.dashboard"))
 
     @app.route("/health", methods=["GET"])
     def health_check():
