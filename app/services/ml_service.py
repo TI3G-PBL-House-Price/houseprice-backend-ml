@@ -24,7 +24,7 @@ class MLService:
     def get_model(cls, model_path=None):
         """Pemuatan model scikit-learn (.pkl) dengan caching in-memory."""
         if model_path is None:
-            model_path = current_app.config.get("MODEL_PATH", "models_artefacts/model.pkl")
+            model_path = current_app.config.get("MODEL_PATH", "models_artefacts/house_price_xgb_model.pkl")
 
         if cls._model is not None and cls._model_loaded_from == model_path:
             return cls._model

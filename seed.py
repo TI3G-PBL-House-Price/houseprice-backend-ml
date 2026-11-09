@@ -160,8 +160,8 @@ def seed_database():
         print(f"  [OK] Metadata dataset primer ({file_name}, {total_records:,} baris, {file_size_bytes:,} bytes) dicatat dinamis.")
 
         # 7. SEED ML MODELS (Metrik & Arsitektur Dibaca Dinamis dari Berkas Model)
-        model_path = os.path.join(app.root_path, "..", "models_artefacts", "model.pkl")
-        eval_path = os.path.join(app.root_path, "..", "models_artefacts", "model_eval.pkl")
+        model_path = os.path.join(app.root_path, "..", "models_artefacts", "house_price_xgb_model.pkl")
+        eval_path = os.path.join(app.root_path, "..", "models_artefacts", "hasil_xgb.pkl")
 
         model_name = "XGBoost Regressor (Tuned)"
         algorithm_type = "XGBoost + GridSearchCV"
@@ -195,7 +195,7 @@ def seed_database():
             id=uuid.uuid4(),
             model_name=model_name,
             version="v1.0.0",
-            model_file_path="models_artefacts/model.pkl",
+            model_file_path="models_artefacts/house_price_xgb_model.pkl",
             algorithm_type=algorithm_type,
             r2_score=round(r2_score, 4),
             mae_score=round(mae_score, 4),

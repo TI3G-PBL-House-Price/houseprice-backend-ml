@@ -37,7 +37,7 @@ Repositori ini memuat implementasi backend RESTful API, orkestrasi basis data Po
   - Model relasional lengkap dengan native UUID, *foreign key constraints*, *composite indexes*, *check constraints*, dan *partial unique index* (`idx_ml_models_active`).
   - Manajemen migrasi DDL otomatis menggunakan **Alembic** (`flask db upgrade`).
 * **ML Service Layer & Market Heuristics:**
-  - Pemuatan artefak biner pipeline Scikit-Learn (`models_artefacts/model.pkl`) dengan *in-memory caching*.
+  - Pemuatan artefak biner pipeline Scikit-Learn (`models_artefacts/house_price_xgb_model.pkl`) dengan *in-memory caching*.
   - Mekanisme *fallback* cerdas berbasis statistik rata-rata harga per meter persegi DKI Jakarta saat model biner belum dilatih.
   - Kalkulasi toleransi harga wajar ($\pm 10\%$) dan pencatatan latensi komputasi server ($< 1.500$ ms).
 * **Web Admin Engineering Console (`/admin`):**
@@ -108,7 +108,7 @@ DB_NAME=houseprice_db
 DB_USER=houseprice_admin
 DB_PASSWORD=houseprice_secret_pass
 
-MODEL_PATH=models_artefacts/model.pkl
+MODEL_PATH=models_artefacts/house_price_xgb_model.pkl
 ALLOWED_ORIGINS=*
 ```
 
@@ -258,7 +258,8 @@ Layer `MLService` pada `app/services/ml_service.py` telah dirancang bersifat mod
 1. Model terbaik hasil eksperimen repositori `ml-model-testing` menggunakan algoritma **XGBoost Regressor (Tuned dengan GridSearchCV)** dengan performa testing $R^2 = 83{,}10\%$, MAE = $0{,}2230$, dan RMSE = $0{,}3350$.
 2. Pipeline biner model lengkap (termasuk *ColumnTransformer* One-Hot Encoding dan regressor XGBoost) tersimpan pada direktori:
    ```text
-   models_artefacts/model.pkl
+   models_artefacts/house_price_xgb_model.pkl
+   models_artefacts/hasil_xgb.pkl
    ```
 3. Saat aplikasi Flask dijalankan, `MLService` otomatis mendeteksi dan memuat berkas biner tersebut. `MLService` juga secara cerdas mendeteksi skala logaritmik $\log(1 + \text{harga})$ dan melakukan konversi kembali ke nominal Rupiah asli menggunakan $\exp(y) - 1$ (`np.expm1`).
 4. Jika berkas model tidak ditemukan atau mengalami kendala masukan tak lazim, `MLService` secara otomatis beralih (*graceful fallback*) ke kalkulasi estimasi harga berbasis agregasi statistik pasar per meter persegi DKI Jakarta.
@@ -288,7 +289,7 @@ houseprice-backend-ml/
 │   └── extensions.py         # Ekstensi SQLAlchemy, Bcrypt, Migrate, CORS
 ├── docs/                     # Submodule Git dokumentasi PBL (PRD, OpenAPI, dll)
 ├── migrations/               # Berkas migrasi DDL Alembic
-├── models_artefacts/         # Direktori penyimpanan biner model.pkl
+├── models_artefacts/         # Direktori penyimpanan biner model & evaluasi ML
 ├── tests/                    # Pytest automated test suites (23 test cases)
 ├── uploads/datasets/         # Direktori penyimpanan unggahan dataset CSV
 ├── .env.example              # Template variabel lingkungan publik
