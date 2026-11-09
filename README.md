@@ -43,10 +43,13 @@ Repositori ini memuat implementasi backend RESTful API, orkestrasi basis data Po
 * **Web Admin Engineering Console (`/admin`):**
   - Antarmuka modern bertema *Dark Zinc Engineering Console* dengan font *JetBrains Mono* + *Plus Jakarta Sans*.
   - Pemantauan 4 metrik KPI ($R^2$, MAE, Latensi server, Volume Dataset).
-  - 2 grafik interaktif Chart.js (komparasi model regresi & tarif harga pasar per $m^2$).
-  - *Live Inference Workbench* yang mencatat hasil pengujian ke tabel `prediction_logs`.
-  - Manajemen Unggah Dataset CSV (FR-WEB-03) dengan penentuan rasio *train-test split* dan pratinjau data tabular 10 baris pertama.
+  - 2 grafik interaktif Chart.js dinamis (akurasi model aktif terlatih & sebaran harga pasar per $m^2$ berbasis `MarketStatistic`).
+  - *Live Inference Workbench* dengan **Searchable Dropdown Kecamatan** (254 wilayah terfilter dinamis per kota) yang mencatat telemetri ke `prediction_logs`.
+  - Format waktu seluruh log telemetri dan audit tersinkronisasi otomatis ke **Waktu Indonesia Barat (WIB / UTC+7)**.
+  - Manajemen Unggah Dataset CSV (FR-WEB-03) dengan penentuan rasio *train-test split* dan pratinjau data tabular 10 baris pertama riil dari CSV.
   - Pengalihan model aktif produksi (*switch active model*) dan pencatatan jejak audit aktivitas ke `system_audit_logs`.
+* **Arsitektur 100% Bebas Data Dummy:**
+  - Seluruh data master wilayah (254 kecamatan), ringkasan statistik pasar (259 entitas), metadata dataset, dan model ML diambil secara murni dan dinamis dari berkas dataset asli (`jakarta_house.csv`) dan berkas model riil (`house_price_xgb_model.pkl` & `hasil_xgb.pkl`).
 * **Observabilitas & Pemantauan:**
   - Rute `/health` aktif memverifikasi *heartbeat* koneksi PostgreSQL secara riil.
 
@@ -133,11 +136,12 @@ Terapkan skema 9 tabel relasional ke basis data PostgreSQL:
 flask db upgrade
 ```
 
-### Langkah 7: Jalankan Seeder Basis Data
-Isi basis data dengan akun administrator, data master 46 lokasi wilayah DKI Jakarta, rata-rata pasar, metadata dataset, registri model ML, dan data sampel:
+### Langkah 7: Jalankan Seeder Basis Data (100% Dinamis)
+Inisialisasi basis data secara dinamis dari dataset asli dan model terlatih:
 ```powershell
 python seed.py
 ```
+*(Perintah ini mengekstrak 254 Master Wilayah riil, mengkalkulasi 259 ringkasan statistik pasar langsung dari `jakarta_house.csv`, membaca evaluasi model ML dari `hasil_xgb.pkl`, serta menginisialisasi akun resmi tanpa menyisakan data dummy).*
 
 ### Langkah 8: Jalankan Server Pengembangan Flask
 Mulai aplikasi backend:
@@ -175,7 +179,7 @@ Setelah menjalankan `python seed.py`, Anda dapat menggunakan akun bawaan berikut
 
 ### 1. Akun Web Admin Console (`http://localhost:5000/admin/login`)
 * **Username / Email:** `admin_hanif` atau `hanif@houseprice.id`
-* **Kata Sandi:** `Admin123!`
+* **Kata Sandi:** `Admin@12345`
 * *Tips:* Tersedia tombol cepat **"Isi Otomatis Kredensial Demo"** di halaman login admin untuk kemudahan demonstrasi.
 
 ### 2. Akun Pengguna Mobile (Untuk Testing Endpoint API)
@@ -208,7 +212,7 @@ Seluruh endpoint di bawah ini mengacu secara ketat pada kontrak spesifikasi Open
 ### 📍 3. Master Data & Market Statistics (`/api/v1`)
 | Method | Endpoint | Proteksi | Deskripsi |
 | :---: | :--- | :---: | :--- |
-| `GET` | `/api/v1/locations` | Publik | Data 46 kecamatan dikelompokkan ke dalam 5 kota administratif DKI Jakarta. |
+| `GET` | `/api/v1/locations` | Publik | Data 254 kecamatan riil dikelompokkan ke dalam 5 kota administratif DKI Jakarta. |
 | `GET` | `/api/v1/market-statistics` | Publik | Rata-rata harga pasar properti per $m^2$ dengan filter query parameter `?city=` dan `?district=`. |
 
 ### 🔔 4. In-App Notifications (`/api/v1/notifications`)
@@ -255,7 +259,7 @@ Tingkat Kelulusan: 100% LULUS (23 dari 23 skenario uji)
 
 Layer `MLService` pada `app/services/ml_service.py` telah dirancang bersifat modular dan *plug-and-play*:
 
-1. Model terbaik hasil eksperimen repositori `ml-model-testing` menggunakan algoritma **XGBoost Regressor (Tuned dengan GridSearchCV)** dengan performa testing $R^2 = 83{,}10\%$, MAE = $0{,}2230$, dan RMSE = $0{,}3350$.
+1. Model terbaik hasil eksperimen repositori `ml-model-testing` menggunakan algoritma **XGBoost Regressor (Tuned dengan GridSearchCV)** dengan performa testing $R^2 = 83{,}08\%$, MAE = $0{,}2230$, dan RMSE = $0{,}3350$.
 2. Pipeline biner model lengkap (termasuk *ColumnTransformer* One-Hot Encoding dan regressor XGBoost) tersimpan pada direktori:
    ```text
    models_artefacts/house_price_xgb_model.pkl
