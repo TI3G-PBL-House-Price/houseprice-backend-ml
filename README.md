@@ -4,6 +4,7 @@
 [![Flask](https://img.shields.io/badge/Flask-3.0.3-000000?style=flat&logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15_Alpine-336791?style=flat&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Scikit-Learn](https://img.shields.io/badge/scikit--learn-1.5.2-F7931E?style=flat&logo=scikitlearn&logoColor=white)](https://scikit-learn.org/)
+[![XGBoost](https://img.shields.io/badge/XGBoost-2.0+-2072AF?style=flat&logo=xgboost&logoColor=white)](https://xgboost.readthedocs.io/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
 [![Tests](https://img.shields.io/badge/Pytest-23_Passed-success?style=flat&logo=pytest&logoColor=white)](https://docs.pytest.org/)
 
@@ -118,6 +119,14 @@ docker-compose up -d db
 ```
 *(Atau pastikan service PostgreSQL lokal Anda aktif dengan kredensial yang sesuai di `.env`)*.
 
+> [!TIP]
+> **Menangani Bentrok Port 5432 (Jika Laptop Memiliki PostgreSQL Lokal):**
+> Jika di laptop Anda sudah terpasang PostgreSQL lokal (misal bawaan Windows, Laragon, atau pgAdmin yang sudah memakai port default `5432`), Anda tidak perlu mengubah kode repositori atau `docker-compose.yml`. Cukup sesuaikan parameter `DB_PORT` pada file lokal **`.env`** Anda ke port yang kosong (misal: `5434`):
+> ```ini
+> DB_PORT=5434
+> ```
+> Saat menjalankan `docker-compose up -d db`, Docker Compose secara dinamis membaca variabel `${DB_PORT:-5432}` dari file `.env` Anda sehingga port container otomatis terpetakan ke `5434:5432`. Anggota tim lain yang tidak mengalami bentrok tetap dapat menggunakan port default `5432` tanpa saling mengganggu, karena file `.env` bersifat rahasia dan diabaikan oleh Git (`.gitignore`).
+
 ### Langkah 6: Jalankan Migrasi Basis Data (Alembic)
 Terapkan skema 9 tabel relasional ke basis data PostgreSQL:
 ```powershell
@@ -171,8 +180,8 @@ Setelah menjalankan `python seed.py`, Anda dapat menggunakan akun bawaan berikut
 
 ### 2. Akun Pengguna Mobile (Untuk Testing Endpoint API)
 * **Akun 1:** `budi.santoso@gmail.com` / `Password123!`
-* **Akun 2:** `siti.aminah@yahoo.com` / `Password123!`
-* **Akun 3:** `ahmad.fauzi@outlook.com` / `Password123!`
+* **Akun 2:** `siti.rahma@gmail.com` / `Password123!`
+* **Akun 3:** `kevin.wijaya@gmail.com` / `Password123!`
 
 ---
 
@@ -246,17 +255,13 @@ Tingkat Kelulusan: 100% LULUS (23 dari 23 skenario uji)
 
 Layer `MLService` pada `app/services/ml_service.py` telah dirancang bersifat modular dan *plug-and-play*:
 
-1. Selesaikan pelatihan model regresi terbaik pada repositori eksperimen `ml-model-testing` (misal: Random Forest dengan $R^2 \ge 80\%$).
-2. Simpan biner pipeline lengkap (beserta One-Hot Encoding dan Scaler):
-   ```python
-   import joblib
-   joblib.dump(best_pipeline, "model.pkl")
-   ```
-3. Letakkan berkas biner tersebut pada direktori:
+1. Model terbaik hasil eksperimen repositori `ml-model-testing` menggunakan algoritma **XGBoost Regressor (Tuned dengan GridSearchCV)** dengan performa testing $R^2 = 83{,}10\%$, MAE = $0{,}2230$, dan RMSE = $0{,}3350$.
+2. Pipeline biner model lengkap (termasuk *ColumnTransformer* One-Hot Encoding dan regressor XGBoost) tersimpan pada direktori:
    ```text
    models_artefacts/model.pkl
    ```
-4. Saat aplikasi Flask dijalankan, `MLService` akan otomatis mendeteksi, memuat, dan menggunakan model `.pkl` tersebut untuk inferensi `POST /api/v1/predict` tanpa perubahan kode.
+3. Saat aplikasi Flask dijalankan, `MLService` otomatis mendeteksi dan memuat berkas biner tersebut. `MLService` juga secara cerdas mendeteksi skala logaritmik $\log(1 + \text{harga})$ dan melakukan konversi kembali ke nominal Rupiah asli menggunakan $\exp(y) - 1$ (`np.expm1`).
+4. Jika berkas model tidak ditemukan atau mengalami kendala masukan tak lazim, `MLService` secara otomatis beralih (*graceful fallback*) ke kalkulasi estimasi harga berbasis agregasi statistik pasar per meter persegi DKI Jakarta.
 
 ---
 
@@ -264,6 +269,9 @@ Layer `MLService` pada `app/services/ml_service.py` telah dirancang bersifat mod
 
 ```text
 houseprice-backend-ml/
+├── .github/                  # Konfigurasi otomasi CI/CD GitHub Actions
+│   └── workflows/
+│       └── backend-ci.yml    # Pipeline otomatis linter (flake8), database, & pytest
 ├── app/
 │   ├── blueprints/           # Modular route controllers
 │   │   ├── admin/            # Web Admin console (/admin)

@@ -120,7 +120,7 @@ def predict_price(current_user):
                 },
                 "model_info": {
                     "version": model_info.get("version", "v1.0.0"),
-                    "algorithm": model_info.get("algorithm", "Random Forest Regressor")
+                    "algorithm": model_info.get("algorithm", "XGBoost Regressor (Tuned)")
                 },
                 "performance": {
                     "latency_ms": latency_ms

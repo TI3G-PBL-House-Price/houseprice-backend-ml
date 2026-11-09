@@ -57,7 +57,7 @@ class MLService:
 
         return {
             "version": "v1.0.0",
-            "algorithm": "Random Forest Regressor"
+            "algorithm": "XGBoost Regressor (Tuned)"
         }
 
     @classmethod
@@ -88,29 +88,64 @@ class MLService:
         Menjalankan inferensi estimasi harga properti.
         Mengembalikan tuple: (predicted_price, tolerance_range, model_info, latency_ms)
         """
-        start_time = time.time()
         model_info = cls.get_active_model_info()
         model = cls.get_model()
+        start_time = time.time()
 
         predicted_price = None
 
         if model is not None:
             try:
+                import numpy as np
                 import pandas as pd
-                input_df = pd.DataFrame([{
-                    "city": city,
-                    "district": district,
-                    "surface_area": surface_area,
-                    "building_area": building_area,
-                    "bed": bed,
-                    "bath": bath,
-                    "carport": carport
-                }])
+
+                # Skema fitur sesuai dataset pelatihan model ML (XGBoost/RandomForest Pipeline)
+                features_payload = {
+                    "district": [district],
+                    "city": [city],
+                    "bed_rooms": [int(bed)],
+                    "bath_rooms": [int(bath)],
+                    "carport": [int(carport)],
+                    "land_area": [float(surface_area)],
+                    "building_area": [float(building_area)],
+                }
+                input_df = pd.DataFrame(features_payload)
+
                 raw_prediction = model.predict(input_df)[0]
-                predicted_price = round(float(raw_prediction), 2)
+                pred_val = float(raw_prediction)
+
+                # Deteksi otomatis invers logaritmik:
+                # Jika model dilatih pada target log1p(price) (nilai < 50.0), konversi kembali ke skala Rupiah
+                if pred_val < 50.0:
+                    pred_val = float(np.expm1(pred_val))
+
+                if pred_val > 0:
+                    predicted_price = round(pred_val, 2)
             except Exception as e:
-                logger.warning(f"Inferensi model .pkl gagal, beralih ke fallback: {e}")
-                predicted_price = None
+                # Fallback skema kolom alternatif (jika model menggunakan nama parameter API langsung)
+                try:
+                    import numpy as np
+                    import pandas as pd
+
+                    alt_payload = {
+                        "city": [city],
+                        "district": [district],
+                        "surface_area": [float(surface_area)],
+                        "building_area": [float(building_area)],
+                        "bed": [int(bed)],
+                        "bath": [int(bath)],
+                        "carport": [int(carport)],
+                    }
+                    alt_df = pd.DataFrame(alt_payload)
+                    raw_prediction = model.predict(alt_df)[0]
+                    pred_val = float(raw_prediction)
+                    if pred_val < 50.0:
+                        pred_val = float(np.expm1(pred_val))
+                    if pred_val > 0:
+                        predicted_price = round(pred_val, 2)
+                except Exception as inner_e:
+                    logger.warning(f"Inferensi model .pkl gagal, beralih ke fallback: {e} | {inner_e}")
+                    predicted_price = None
 
         if predicted_price is None:
             predicted_price = cls.calculate_price_heuristic(

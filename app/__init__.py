@@ -15,6 +15,12 @@ def create_app(config_class=Config):
     # Impor Model Basis Data (agar terdaftar di metadata SQLAlchemy & Flask-Migrate)
     with app.app_context():
         from . import models
+        # Preload artefak model ML ke memori (in-memory caching warm-up)
+        try:
+            from app.services.ml_service import MLService
+            MLService.get_model()
+        except Exception:
+            pass
 
     # Registrasi Blueprint
     from app.blueprints.auth.routes import auth_bp

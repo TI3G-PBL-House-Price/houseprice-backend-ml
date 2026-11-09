@@ -192,20 +192,20 @@ def seed_database():
 
         # 6. SEED ML MODELS
         if MLModel.query.count() == 0:
-            # Model Aktif: Random Forest Regressor
-            rf_model = MLModel(
+            # Model Aktif: XGBoost Regressor (Tuned dengan GridSearchCV)
+            xgb_model = MLModel(
                 id=uuid.uuid4(),
-                model_name="Random Forest Regressor",
+                model_name="XGBoost Regressor (Tuned)",
                 version="v1.0.0",
                 model_file_path="models_artefacts/model.pkl",
-                algorithm_type="Ensemble",
-                r2_score=0.8272,
-                mae_score=1063034875.00,
-                rmse_score=1808105786.00,
+                algorithm_type="XGBoost + GridSearchCV",
+                r2_score=0.8310,
+                mae_score=0.2230,
+                rmse_score=0.3350,
                 is_active=True,
                 trained_by=admin.id,
             )
-            db.session.add(rf_model)
+            db.session.add(xgb_model)
 
             # Model Pembanding: Baseline Linear Regression
             lr_model = MLModel(
@@ -222,7 +222,7 @@ def seed_database():
             )
             db.session.add(lr_model)
             db.session.commit()
-            print("  [OK] Registri model ML (Random Forest v1.0.0 & Linear v0.9.0) berhasil disimpan.")
+            print("  [OK] Registri model ML (XGBoost v1.0.0 & Linear v0.9.0) berhasil disimpan.")
 
         # 7. SEED PREDICTION LOGS
         if PredictionLog.query.count() == 0:
