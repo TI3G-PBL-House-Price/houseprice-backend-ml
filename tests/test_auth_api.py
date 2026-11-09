@@ -60,3 +60,13 @@ def test_auth_me_unauthorized(client):
     data = res.get_json()
     assert data["status"] == "error"
 
+
+def test_health_check_endpoint(client):
+    """Memverifikasi endpoint /health mengembalikan status kesehatan backend dan konektivitas DB."""
+    res = client.get("/health")
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["status"] == "ok"
+    assert data["services"]["database"] == "healthy"
+
+

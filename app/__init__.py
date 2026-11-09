@@ -35,6 +35,19 @@ def create_app(config_class=Config):
 
     @app.route("/health", methods=["GET"])
     def health_check():
-        return {"status": "ok", "message": "HousePrice API is healthy"}, 200
+        db_status = "healthy"
+        try:
+            db.session.execute(db.text("SELECT 1"))
+        except Exception:
+            db_status = "unhealthy"
+
+        return {
+            "status": "ok" if db_status == "healthy" else "degraded",
+            "message": "HousePrice API is operational",
+            "services": {
+                "database": db_status,
+                "api": "healthy"
+            }
+        }, (200 if db_status == "healthy" else 503)
 
     return app
