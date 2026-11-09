@@ -60,7 +60,7 @@
                         <span>API ONLINE</span>
                     </span>
                     <span class="text-zinc-700">|</span>
-                    <span class="text-zinc-400">Model: <strong class="text-zinc-200">{{ active_model.model_name if active_model else 'Random Forest' }} ({{ active_model.version if active_model else 'v1.0.0' }})</strong></span>
+                    <span class="text-zinc-400">Model: <strong class="text-zinc-200">{{ active_model.model_name if active_model else 'XGBRegressor (Tuned)' }} ({{ active_model.version if active_model else 'v1.0.0' }})</strong></span>
                     <span class="text-zinc-700">|</span>
                     <span class="text-zinc-400">DB: <span class="text-zinc-300">PostgreSQL 15</span></span>
                 </div>
@@ -133,7 +133,7 @@
                         <span class="text-xs text-zinc-400">({{ active_model.r2_score if active_model else '0.8272' }})</span>
                     </div>
                     <p class="text-[11px] text-zinc-400 mt-1.5 font-mono">
-                        Algoritma: {{ active_model.model_name if active_model else 'Random Forest' }}
+                        Algoritma: {{ active_model.model_name if active_model else 'XGBRegressor (Tuned)' }}
                     </p>
                 </div>
             </div>
@@ -600,18 +600,22 @@
             activeBtn.classList.add('border-blue-500', 'text-blue-400', 'font-semibold');
         }
 
-        // CHART 1: Model Comparison
+        // CHART 1: Model Comparison (Dinamis dari Basis Data)
         const ctxModel = document.getElementById('modelChart').getContext('2d');
+        const modelLabels = [{% for m in models %}'{{ m.model_name }} ({{ m.version }})'{% if not loop.last %}, {% endif %}{% endfor %}];
+        const modelScores = [{% for m in models %}{{ (m.r2_score * 100)|round(2) }}{% if not loop.last %}, {% endif %}{% endfor %}];
+        const modelColors = [{% for m in models %}'{{ "#2563eb" if m.is_active else "#52525b" }}'{% if not loop.last %}, {% endif %}{% endfor %}];
+
         new Chart(ctxModel, {
             type: 'bar',
             data: {
-                labels: ['Random Forest v1.0.0', 'Multiple Linear Reg v0.9.0'],
+                labels: modelLabels.length ? modelLabels : ['{{ active_model.model_name if active_model else "XGBRegressor (Tuned)" }} ({{ active_model.version if active_model else "v1.0.0" }})'],
                 datasets: [{
                     label: 'Koefisien Determinasi R² (%)',
-                    data: [82.72, 68.40],
-                    backgroundColor: ['#2563eb', '#52525b'],
+                    data: modelScores.length ? modelScores : [{{ (active_model.r2_score * 100)|round(2) if active_model else 83.08 }}],
+                    backgroundColor: modelColors.length ? modelColors : ['#2563eb'],
                     borderRadius: 4,
-                    barPercentage: 0.45
+                    barPercentage: 0.35
                 }]
             },
             options: {
