@@ -1,2 +1,3 @@
-# Package initialization for business and ML services
+from .ml_service import MLService
 
+__all__ = ["MLService"]
