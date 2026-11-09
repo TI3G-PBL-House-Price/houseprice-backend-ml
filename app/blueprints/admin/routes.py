@@ -387,6 +387,17 @@ def retrain():
         except Exception:
             db.session.rollback()
 
+    if request.is_json:
+        return jsonify({
+            "status": "accepted",
+            "message": "Proses pelatihan ulang model berhasil dijadwalkan di latar belakang",
+            "data": {
+                "task_id": str(uuid.uuid4()),
+                "status": "QUEUED",
+                "estimated_duration_seconds": 45
+            }
+        }), 202
+
     flash("Proses pelatihan ulang model (Retraining pipeline) berhasil dipicu di latar belakang.", "info")
     return redirect(url_for("admin.dashboard"))
 
