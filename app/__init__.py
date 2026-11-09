@@ -35,6 +35,18 @@ def create_app(config_class=Config):
     app.register_blueprint(market_bp, url_prefix="/api/v1")
     app.register_blueprint(admin_bp, url_prefix="/admin")
 
+    # Template Filter untuk Waktu Indonesia Barat (WIB / UTC+7)
+    from datetime import timezone, timedelta
+    WIB = timezone(timedelta(hours=7))
+
+    @app.template_filter("wib")
+    def format_wib(dt, fmt="%Y-%m-%d %H:%M:%S"):
+        if not dt:
+            return "-"
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(WIB).strftime(fmt)
+
     @app.route("/", methods=["GET"])
     def index():
         return redirect(url_for("admin.dashboard"))
