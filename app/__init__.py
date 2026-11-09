@@ -20,11 +20,13 @@ def create_app(config_class=Config):
     from app.blueprints.auth.routes import auth_bp
     from app.blueprints.predict.routes import predict_bp
     from app.blueprints.notifications.routes import notifications_bp
+    from app.blueprints.market.routes import market_bp
     from app.blueprints.admin.routes import admin_bp
 
     app.register_blueprint(auth_bp, url_prefix="/api/v1/auth")
     app.register_blueprint(predict_bp, url_prefix="/api/v1/predict")
     app.register_blueprint(notifications_bp, url_prefix="/api/v1/notifications")
+    app.register_blueprint(market_bp, url_prefix="/api/v1")
     app.register_blueprint(admin_bp, url_prefix="/admin")
 
     @app.route("/", methods=["GET"])
