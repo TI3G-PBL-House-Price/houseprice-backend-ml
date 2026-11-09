@@ -159,36 +159,30 @@ def seed_database():
         db.session.commit()
         print(f"  [OK] Metadata dataset primer ({file_name}, {total_records:,} baris, {file_size_bytes:,} bytes) dicatat dinamis.")
 
-        # 7. SEED ML MODELS (Metrik & Arsitektur Dibaca Dinamis dari Berkas Model)
+        # 7. SEED ML MODELS (Metrik & Arsitektur Dibaca 100% Dinamis dari Berkas Model)
         model_path = os.path.join(app.root_path, "..", "models_artefacts", "house_price_xgb_model.pkl")
         eval_path = os.path.join(app.root_path, "..", "models_artefacts", "hasil_xgb.pkl")
 
-        model_name = "XGBoost Regressor (Tuned)"
-        algorithm_type = "XGBoost + GridSearchCV"
-        r2_score = 0.8310
-        mae_score = 0.2230
-        rmse_score = 0.3350
+        if not os.path.exists(eval_path):
+            raise FileNotFoundError(f"Berkas evaluasi model tidak ditemukan di: {eval_path}")
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Berkas model biner tidak ditemukan di: {model_path}")
 
-        if os.path.exists(eval_path):
-            try:
-                eval_data = joblib.load(eval_path)
-                model_name = eval_data.get("Model", model_name)
-                algorithm_type = eval_data.get("Model", algorithm_type)
-                testing_metrics = eval_data.get("Testing", {})
-                r2_score = float(testing_metrics.get("R2", r2_score))
-                mae_score = float(testing_metrics.get("Mean absolute error", mae_score))
-                rmse_score = float(testing_metrics.get("Root mean squared error", rmse_score))
-            except Exception as e:
-                print(f"  [WARN] Gagal membaca evaluasi model dinamis: {e}")
+        # Baca 100% dinamis langsung dari berkas evaluasi hasil_xgb.pkl
+        eval_data = joblib.load(eval_path)
+        algorithm_type = eval_data.get("Model", "XGBoost Regressor")
+        testing_metrics = eval_data.get("Testing", {})
+        r2_score = float(testing_metrics["R2"])
+        mae_score = float(testing_metrics["Mean absolute error"])
+        rmse_score = float(testing_metrics["Root mean squared error"])
 
-        if os.path.exists(model_path):
-            try:
-                loaded_model = joblib.load(model_path)
-                if hasattr(loaded_model, "steps") and loaded_model.steps:
-                    estimator_obj = loaded_model.steps[-1][1]
-                    model_name = f"{estimator_obj.__class__.__name__} (Tuned)"
-            except Exception:
-                pass
+        # Baca 100% dinamis langsung dari arsitektur pipeline house_price_xgb_model.pkl
+        loaded_model = joblib.load(model_path)
+        if hasattr(loaded_model, "steps") and loaded_model.steps:
+            estimator_obj = loaded_model.steps[-1][1]
+            model_name = f"{estimator_obj.__class__.__name__} (Tuned)"
+        else:
+            model_name = f"{loaded_model.__class__.__name__} (Tuned)"
 
         MLModel.query.delete()
         active_model = MLModel(
