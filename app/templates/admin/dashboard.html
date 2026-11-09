@@ -581,6 +581,10 @@
                                     <td class="py-2.5 px-2 text-[11px] {% if loop.last %}text-blue-400 font-bold{% endif %}">{{ cell }}</td>
                                     {% endfor %}
                                 </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="{{ preview_headers|length }}" class="py-6 text-center text-zinc-500 italic text-xs">Belum ada berkas dataset yang tersedia untuk ditampilkan.</td>
+                                </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -663,15 +667,18 @@
             }
         });
 
-        // CHART 2: Regional Property Price Distribution
+        // CHART 2: Regional Property Price Distribution (Dinamis dari MarketStatistic)
         const ctxPrice = document.getElementById('priceChart').getContext('2d');
+        const cityLabels = [{% for s in market_stats %}'{{ s.city }}'{% if not loop.last %}, {% endif %}{% endfor %}];
+        const cityPrices = [{% for s in market_stats %}{{ (s.avg_price_per_sqm / 1000000)|round(1) }}{% if not loop.last %}, {% endif %}{% endfor %}];
+
         new Chart(ctxPrice, {
             type: 'bar',
             data: {
-                labels: ['JakPus', 'JakSel', 'JakUt', 'JakBar', 'JakTim'],
+                labels: cityLabels.length ? cityLabels : ['JakPus', 'JakSel', 'JakUt', 'JakBar', 'JakTim'],
                 datasets: [{
                     label: 'Rata-Rata Harga / m² (Juta Rp)',
-                    data: [28.0, 24.5, 21.0, 18.5, 14.2],
+                    data: cityPrices.length ? cityPrices : [28.0, 24.5, 21.0, 18.5, 14.2],
                     backgroundColor: '#3b82f6',
                     borderRadius: 4,
                     barPercentage: 0.5

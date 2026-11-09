@@ -177,18 +177,7 @@ def dashboard():
             pass
 
     if not preview_rows:
-        preview_rows = [
-            ["Jakarta Selatan", "Kebayoran Baru", "180.0", "220.0", "4", "3", "2", "Rp 7.200.000.000"],
-            ["Jakarta Selatan", "Tebet", "120.0", "140.0", "3", "2", "1", "Rp 4.100.000.000"],
-            ["Jakarta Barat", "Citra Garden", "150.0", "180.0", "4", "3", "2", "Rp 3.850.000.000"],
-            ["Jakarta Barat", "Kebon Jeruk", "110.0", "120.0", "3", "2", "1", "Rp 2.650.000.000"],
-            ["Jakarta Pusat", "Menteng", "250.0", "300.0", "5", "4", "3", "Rp 14.500.000.000"],
-            ["Jakarta Pusat", "Cempaka Putih", "130.0", "150.0", "3", "2", "1", "Rp 4.200.000.000"],
-            ["Jakarta Utara", "Kelapa Gading", "160.0", "200.0", "4", "3", "2", "Rp 5.400.000.000"],
-            ["Jakarta Utara", "Pantai Indah Kapuk", "200.0", "240.0", "4", "4", "2", "Rp 7.900.000.000"],
-            ["Jakarta Timur", "Cakung", "90.0", "75.0", "2", "1", "1", "Rp 1.650.000.000"],
-            ["Jakarta Timur", "Duren Sawit", "140.0", "160.0", "3", "2", "2", "Rp 3.100.000.000"],
-        ]
+        preview_rows = []
 
     return render_template(
         "admin/dashboard.html",
