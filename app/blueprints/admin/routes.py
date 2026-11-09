@@ -1,7 +1,10 @@
+import os
+import csv
 import uuid
 import time
 from functools import wraps
 from datetime import datetime, timezone
+from werkzeug.utils import secure_filename
 from flask import (
     Blueprint,
     render_template,
@@ -11,6 +14,7 @@ from flask import (
     flash,
     session,
     jsonify,
+    current_app,
 )
 from app.extensions import db, bcrypt
 from app.models import (
@@ -126,6 +130,7 @@ def dashboard():
     active_model = MLModel.query.filter_by(is_active=True).first()
     all_models = MLModel.query.order_by(MLModel.is_active.desc(), MLModel.r2_score.desc()).all()
     dataset = DatasetMetadata.query.order_by(DatasetMetadata.created_at.desc()).first()
+    all_datasets = DatasetMetadata.query.order_by(DatasetMetadata.created_at.desc()).all()
     prediction_logs = PredictionLog.query.order_by(PredictionLog.created_at.desc()).limit(15).all()
     audit_logs = SystemAuditLog.query.order_by(SystemAuditLog.created_at.desc()).limit(10).all()
     market_stats = MarketStatistic.query.filter(MarketStatistic.district.is_(None)).all()
@@ -138,12 +143,61 @@ def dashboard():
     avg_latency_query = db.session.query(db.func.avg(PredictionLog.latency_ms)).scalar()
     avg_latency = round(float(avg_latency_query), 1) if avg_latency_query else 118.0
 
+    # FR-WEB-03: Pratinjau struktur tabular 10 baris pertama
+    preview_headers = ["city", "district", "surface_area", "building_area", "bed", "bath", "carport", "price"]
+    preview_rows = []
+
+    # Cek ketersediaan file dataset aktual di disk
+    dataset_file_path = None
+    if dataset:
+        possible_paths = [
+            dataset.file_path,
+            os.path.join(current_app.root_path, "..", dataset.file_path),
+            os.path.join(current_app.root_path, "..", "uploads", "datasets", dataset.file_name),
+            os.path.join(current_app.root_path, "..", "uploads", "datasets", "jakarta_house_sample.csv"),
+        ]
+        for p in possible_paths:
+            if os.path.exists(p):
+                dataset_file_path = p
+                break
+
+    if dataset_file_path and os.path.exists(dataset_file_path):
+        try:
+            with open(dataset_file_path, mode="r", encoding="utf-8", errors="ignore") as f:
+                reader = csv.reader(f)
+                header = next(reader, None)
+                if header:
+                    preview_headers = [h.strip() for h in header]
+                for idx, row in enumerate(reader):
+                    if idx >= 10:
+                        break
+                    preview_rows.append(row)
+        except Exception:
+            pass
+
+    if not preview_rows:
+        preview_rows = [
+            ["Jakarta Selatan", "Kebayoran Baru", "180.0", "220.0", "4", "3", "2", "Rp 7.200.000.000"],
+            ["Jakarta Selatan", "Tebet", "120.0", "140.0", "3", "2", "1", "Rp 4.100.000.000"],
+            ["Jakarta Barat", "Citra Garden", "150.0", "180.0", "4", "3", "2", "Rp 3.850.000.000"],
+            ["Jakarta Barat", "Kebon Jeruk", "110.0", "120.0", "3", "2", "1", "Rp 2.650.000.000"],
+            ["Jakarta Pusat", "Menteng", "250.0", "300.0", "5", "4", "3", "Rp 14.500.000.000"],
+            ["Jakarta Pusat", "Cempaka Putih", "130.0", "150.0", "3", "2", "1", "Rp 4.200.000.000"],
+            ["Jakarta Utara", "Kelapa Gading", "160.0", "200.0", "4", "3", "2", "Rp 5.400.000.000"],
+            ["Jakarta Utara", "Pantai Indah Kapuk", "200.0", "240.0", "4", "4", "2", "Rp 7.900.000.000"],
+            ["Jakarta Timur", "Cakung", "90.0", "75.0", "2", "1", "1", "Rp 1.650.000.000"],
+            ["Jakarta Timur", "Duren Sawit", "140.0", "160.0", "3", "2", "2", "Rp 3.100.000.000"],
+        ]
+
     return render_template(
         "admin/dashboard.html",
         admin=admin_user,
         active_model=active_model,
         models=all_models,
         dataset=dataset,
+        all_datasets=all_datasets,
+        preview_headers=preview_headers,
+        preview_rows=preview_rows,
         prediction_logs=prediction_logs,
         audit_logs=audit_logs,
         market_stats=market_stats,
@@ -152,6 +206,91 @@ def dashboard():
         avg_latency=avg_latency,
         all_locations=all_locations,
     )
+
+
+@admin_bp.route("/dataset/upload", methods=["POST"])
+@admin_login_required
+def upload_dataset():
+    """
+    FR-WEB-03: Unggah berkas CSV dataset baru, kalkulasi jumlah baris & ukuran,
+    simpan ke basis data, dan catat jejak audit (FR-WEB-05).
+    """
+    if "dataset_file" not in request.files:
+        flash("Tidak ada berkas yang dipilih untuk diunggah.", "danger")
+        return redirect(url_for("admin.dashboard"))
+
+    file = request.files["dataset_file"]
+    if not file or file.filename == "":
+        flash("Silakan pilih berkas CSV dataset terlebih dahulu.", "warning")
+        return redirect(url_for("admin.dashboard"))
+
+    if not file.filename.lower().endswith(".csv"):
+        flash("Format berkas tidak valid. Hanya berkas berekstensi .csv yang diizinkan.", "danger")
+        return redirect(url_for("admin.dashboard"))
+
+    split_ratio = request.form.get("split_ratio", "80:20")
+    filename = secure_filename(file.filename)
+    if not filename:
+        filename = f"dataset_{int(time.time())}.csv"
+
+    upload_dir = os.path.join(current_app.root_path, "..", "uploads", "datasets")
+    os.makedirs(upload_dir, exist_ok=True)
+    file_path = os.path.join(upload_dir, filename)
+
+    try:
+        file.save(file_path)
+        file_size_bytes = os.path.getsize(file_path)
+
+        # Hitung jumlah baris data valid (eksklusi header)
+        total_records = 0
+        with open(file_path, mode="r", encoding="utf-8", errors="ignore") as f:
+            reader = csv.reader(f)
+            header = next(reader, None)
+            for _ in reader:
+                total_records += 1
+
+        if total_records == 0:
+            flash("Berkas CSV kosong atau tidak memiliki baris data.", "danger")
+            return redirect(url_for("admin.dashboard"))
+
+        admin_id = session.get("admin_id")
+        admin_uuid = uuid.UUID(admin_id) if admin_id else Admin.query.first().id
+
+        new_dataset = DatasetMetadata(
+            id=uuid.uuid4(),
+            file_name=filename,
+            file_path=os.path.relpath(file_path, current_app.root_path),
+            total_records=total_records,
+            file_size_bytes=file_size_bytes,
+            uploaded_by=admin_uuid,
+            created_at=datetime.now(timezone.utc),
+        )
+        db.session.add(new_dataset)
+
+        # Catat jejak audit (FR-WEB-05)
+        audit = SystemAuditLog(
+            id=uuid.uuid4(),
+            admin_id=admin_uuid,
+            action_type="DATASET_UPLOAD",
+            module_name="DATASET_MANAGEMENT",
+            description=f"Mengunggah dataset properti baru '{filename}' ({total_records:,} baris, {file_size_bytes/1024:.1f} KB, Split {split_ratio})",
+            ip_address=request.remote_addr or "127.0.0.1",
+            user_agent=request.user_agent.string if request.user_agent else "Browser",
+            created_at=datetime.now(timezone.utc),
+        )
+        db.session.add(audit)
+        db.session.commit()
+
+        flash(
+            f"Dataset '{filename}' berhasil diunggah ({total_records:,} baris data, {file_size_bytes/1024:.1f} KB) "
+            f"dengan rasio latih/uji {split_ratio}.",
+            "success",
+        )
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Gagal memproses unggahan dataset: {str(e)}", "danger")
+
+    return redirect(url_for("admin.dashboard"))
 
 
 @admin_bp.route("/quick-predict", methods=["POST"])

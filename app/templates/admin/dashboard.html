@@ -302,6 +302,10 @@
                     <i class="fa-solid fa-shield-halved"></i>
                     <span>Audit Trail ({{ audit_logs|length }})</span>
                 </button>
+                <button onclick="switchTab('datasets')" id="tab-btn-datasets" class="tab-btn pb-2.5 font-medium border-b-2 border-transparent text-zinc-400 hover:text-zinc-200 transition flex items-center space-x-2">
+                    <i class="fa-solid fa-database"></i>
+                    <span>Dataset Manager ({{ all_datasets|length }})</span>
+                </button>
             </div>
 
             <!-- TAB 1: Prediction Logs -->
@@ -448,6 +452,120 @@
                         {% endfor %}
                     </tbody>
                 </table>
+            </div>
+
+            <!-- TAB 5: Dataset Management & CSV Preview (FR-WEB-03) -->
+            <div id="tab-content-datasets" class="tab-content p-4 space-y-6 hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Form Upload CSV -->
+                    <div class="bg-zinc-950/60 p-4 rounded-xl border border-zinc-800">
+                        <div class="flex items-center space-x-2 mb-3 text-xs font-mono text-zinc-300">
+                            <i class="fa-solid fa-cloud-arrow-up text-blue-400"></i>
+                            <span class="font-bold">UNGGAH DATASET CSV (FR-WEB-03)</span>
+                        </div>
+                        <p class="text-xs text-zinc-400 mb-4 font-sans">
+                            Unggah berkas properti baru (misal: <code class="text-zinc-300 bg-zinc-800 px-1 py-0.5 rounded">jakarta_house.csv</code>) untuk memperbarui data latih dan memicu retraining model.
+                        </p>
+                        <form action="{{ url_for('admin.upload_dataset') }}" method="POST" enctype="multipart/form-data" class="space-y-4 text-xs font-mono">
+                            <div>
+                                <label class="block text-zinc-400 mb-1.5 font-sans">Pilih Berkas (.csv):</label>
+                                <input type="file" name="dataset_file" accept=".csv" required
+                                       class="w-full text-zinc-300 bg-zinc-900 border border-zinc-700 rounded-lg p-2 file:mr-3 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:bg-zinc-800 file:text-zinc-200 hover:file:bg-zinc-700 cursor-pointer">
+                            </div>
+                            <div>
+                                <label class="block text-zinc-400 mb-1.5 font-sans">Rasio Train-Test Split:</label>
+                                <select name="split_ratio" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-200 focus:outline-none focus:border-blue-500">
+                                    <option value="80:20" selected>80% Latih : 20% Uji (Standar)</option>
+                                    <option value="70:30">70% Latih : 30% Uji</option>
+                                    <option value="85:15">85% Latih : 15% Uji</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-sans font-semibold py-2 px-4 rounded-lg transition flex items-center justify-center space-x-2">
+                                <i class="fa-solid fa-file-import"></i>
+                                <span>Unggah & Proses Dataset</span>
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Dataset Metadata Ringkasan -->
+                    <div class="lg:col-span-2 bg-zinc-950/60 p-4 rounded-xl border border-zinc-800 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between text-xs font-mono text-zinc-300 mb-3">
+                                <div class="flex items-center space-x-2">
+                                    <i class="fa-solid fa-circle-info text-emerald-400"></i>
+                                    <span class="font-bold">METADATA DATASET AKTIF</span>
+                                </div>
+                                <span class="bg-emerald-950/60 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded text-[10px] font-semibold">
+                                    PRIMARY TRAINING DATA
+                                </span>
+                            </div>
+                            {% if dataset %}
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4 font-mono text-xs">
+                                <div class="bg-zinc-900 p-3 rounded-lg border border-zinc-800/80">
+                                    <span class="text-zinc-500 text-[10px] block">NAMA BERKAS</span>
+                                    <span class="text-zinc-200 font-semibold truncate block mt-1" title="{{ dataset.file_name }}">{{ dataset.file_name }}</span>
+                                </div>
+                                <div class="bg-zinc-900 p-3 rounded-lg border border-zinc-800/80">
+                                    <span class="text-zinc-500 text-[10px] block">VOLUME BARIS</span>
+                                    <span class="text-emerald-400 font-bold text-sm block mt-1">{{ "{:,}".format(dataset.total_records) }}</span>
+                                </div>
+                                <div class="bg-zinc-900 p-3 rounded-lg border border-zinc-800/80">
+                                    <span class="text-zinc-500 text-[10px] block">UKURAN BERKAS</span>
+                                    <span class="text-blue-400 font-semibold block mt-1">{{ (dataset.file_size_bytes / 1024)|round(1) }} KB</span>
+                                </div>
+                                <div class="bg-zinc-900 p-3 rounded-lg border border-zinc-800/80">
+                                    <span class="text-zinc-500 text-[10px] block">WAKTU UNGGAH</span>
+                                    <span class="text-zinc-400 text-[11px] block mt-1">{{ dataset.created_at.strftime('%Y-%m-%d %H:%M') if dataset.created_at else '-' }}</span>
+                                </div>
+                            </div>
+                            {% else %}
+                            <p class="text-zinc-400 text-xs italic mt-4">Belum ada dataset yang diunggah.</p>
+                            {% endif %}
+                        </div>
+
+                        <!-- Info Retrain Callout -->
+                        <div class="mt-4 p-3 bg-zinc-900/80 border border-zinc-800 rounded-lg flex items-center justify-between">
+                            <span class="text-[11px] text-zinc-400 font-sans">Ingin memperbarui model ML dengan dataset ini?</span>
+                            <form action="{{ url_for('admin.retrain') }}" method="POST">
+                                <button type="submit" class="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 px-3 py-1.5 rounded transition flex items-center space-x-1.5 font-sans">
+                                    <i class="fa-solid fa-arrows-rotate text-blue-400 text-[11px]"></i>
+                                    <span>Picu Retraining</span>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabular Preview 10 Baris -->
+                <div class="border border-zinc-800 rounded-xl overflow-hidden bg-zinc-950/40">
+                    <div class="bg-zinc-950/80 px-4 py-2.5 border-b border-zinc-800 flex items-center justify-between text-xs font-mono">
+                        <div class="flex items-center space-x-2 text-zinc-300">
+                            <i class="fa-solid fa-table text-indigo-400"></i>
+                            <span class="font-bold">PRATINJAU STRUKTUR DATA TABULAR (10 BARIS PERTAMA)</span>
+                        </div>
+                        <span class="text-zinc-500 text-[11px]">Sampel Validasi Kolom Fitur</span>
+                    </div>
+                    <div class="overflow-x-auto p-4">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="text-[11px] uppercase text-zinc-400 border-b border-zinc-800 font-mono">
+                                    {% for h in preview_headers %}
+                                    <th class="pb-2.5 font-medium px-2">{{ h }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-zinc-800/60 font-mono text-zinc-300">
+                                {% for row in preview_rows %}
+                                <tr class="hover:bg-zinc-800/40 transition">
+                                    {% for cell in row %}
+                                    <td class="py-2.5 px-2 text-[11px] {% if loop.last %}text-blue-400 font-bold{% endif %}">{{ cell }}</td>
+                                    {% endfor %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
 
