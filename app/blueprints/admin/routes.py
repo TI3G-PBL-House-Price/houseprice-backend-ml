@@ -26,6 +26,7 @@ from app.models import (
     MarketStatistic,
     MasterLocation,
 )
+from app.services.ml_service import MLService
 
 admin_bp = Blueprint("admin", __name__, template_folder="../templates")
 
@@ -154,7 +155,7 @@ def dashboard():
             dataset.file_path,
             os.path.join(current_app.root_path, "..", dataset.file_path),
             os.path.join(current_app.root_path, "..", "uploads", "datasets", dataset.file_name),
-            os.path.join(current_app.root_path, "..", "uploads", "datasets", "jakarta_house_sample.csv"),
+            os.path.join(current_app.root_path, "..", "uploads", "datasets", "jakarta_house.csv"),
         ]
         for p in possible_paths:
             if os.path.exists(p):
@@ -311,26 +312,17 @@ def quick_predict():
         flash("Masukan parameter luas fisik atau fasilitas numerik tidak valid.", "danger")
         return redirect(url_for("admin.dashboard"))
 
-    # Estimasi berbasis statistik pasar wilayah aktual
-    base_sqm_rates = {
-        "Jakarta Pusat": 28000000.0,
-        "Jakarta Selatan": 24500000.0,
-        "Jakarta Utara": 21000000.0,
-        "Jakarta Barat": 18500000.0,
-        "Jakarta Timur": 14200000.0,
-    }
-    base_rate = base_sqm_rates.get(city, 20000000.0)
-    
-    # Model regresi aproksimasi
-    area_factor = (surface_area * 0.55) + (building_area * 0.45)
-    facility_factor = 1.0 + (bed * 0.04) + (bath * 0.03) + (carport * 0.02)
-    calculated_price = area_factor * base_rate * facility_factor
-
-    # Hitung latensi komputasi server (ms)
-    elapsed_ms = int((time.time() - start_time) * 1000) + 114
-
-    active_model = MLModel.query.filter_by(is_active=True).first()
-    model_ver = active_model.version if active_model else "v1.0.0"
+    # Eksekusi inferensi menggunakan model ML riil (XGBoost Pipeline)
+    calculated_price, tolerance, model_info, elapsed_ms = MLService.predict(
+        city=city,
+        district=district,
+        surface_area=surface_area,
+        building_area=building_area,
+        bed=bed,
+        bath=bath,
+        carport=carport
+    )
+    model_ver = model_info.get("version", "v1.0.0")
 
     admin_id = session.get("admin_id")
     new_log = PredictionLog(

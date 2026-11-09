@@ -1,6 +1,8 @@
+import os
 import io
 import uuid
 import pytest
+from app.extensions import db
 from app.models.ml import DatasetMetadata
 from app.models.log import SystemAuditLog
 
@@ -63,6 +65,17 @@ def test_admin_upload_dataset_success(client, app):
         audit = SystemAuditLog.query.filter_by(action_type="DATASET_UPLOAD").order_by(SystemAuditLog.created_at.desc()).first()
         assert audit is not None
         assert unique_filename in audit.description
+
+        # Cleanup berkas sementara dan record uji coba agar direktori datasets tetap bersih
+        uploaded_path = os.path.join(app.root_path, "..", "uploads", "datasets", unique_filename)
+        if os.path.exists(uploaded_path):
+            try:
+                os.remove(uploaded_path)
+            except OSError:
+                pass
+        db.session.delete(record)
+        db.session.delete(audit)
+        db.session.commit()
 
 
 def test_admin_upload_dataset_invalid_format(client):
