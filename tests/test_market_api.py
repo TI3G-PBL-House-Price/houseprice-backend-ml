@@ -3,7 +3,7 @@ from app.extensions import db
 from app.models.location import MasterLocation, MarketStatistic
 
 
-@pytest.fixture(scope="module", autouse=True)
+@pytest.fixture(autouse=True)
 def ensure_market_fixture_data(app):
     """Menjamin data master lokasi & statistik pasar tersedia selama pengujian modul market API."""
     with app.app_context():
