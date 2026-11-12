@@ -2,7 +2,6 @@ import os
 import sys
 import uuid
 import joblib
-import pandas as pd
 from datetime import datetime, timezone
 
 # Pastikan UTF-8 encoding untuk output Windows console
@@ -23,10 +22,12 @@ from app.models import (
     SystemAuditLog,
 )
 
+
 def seed_database():
+    """Inisialisasi data sektor inti (admins, users, ml_models) tanpa dependensi file CSV."""
     app = create_app()
     with app.app_context():
-        print("[SEED] Memulai proses sinkronisasi dinamis basis data HousePrice...")
+        print("[SEED] Memulai inisialisasi sektor inti basis data HousePrice...")
 
         # 1. SEED ADMINS (Login Resmi)
         admin = Admin.query.filter_by(email="hanif@houseprice.id").first()
@@ -66,124 +67,18 @@ def seed_database():
         db.session.commit()
         print("  [OK] Akun user mobile resmi berhasil diverifikasi.")
 
-        # 3. BACA DATASET PRIMER SECARA DINAMIS
-        dataset_path = os.path.join(app.root_path, "..", "uploads", "datasets", "jakarta_house.csv")
-        if not os.path.exists(dataset_path):
-            alt_path = os.path.join(app.root_path, "..", "..", "ml-model-testing", "dataset", "jakarta_house.csv")
-            if os.path.exists(alt_path):
-                import shutil
-                os.makedirs(os.path.dirname(dataset_path), exist_ok=True)
-                shutil.copy(alt_path, dataset_path)
-            else:
-                sample_path = os.path.join(app.root_path, "..", "uploads", "datasets", "jakarta_house_sample.csv")
-                if os.path.exists(sample_path):
-                    dataset_path = sample_path
-
-        if not os.path.exists(dataset_path):
-            raise FileNotFoundError(f"Berkas dataset primer tidak ditemukan di: {dataset_path}")
-
-        df = pd.read_csv(dataset_path)
-
-        # Normalisasi nama kolom fleksibel (mendukung skema ML maupun backend)
-        if "land_area" not in df.columns and "surface_area" in df.columns:
-            df["land_area"] = df["surface_area"]
-        if "surface_area" not in df.columns and "land_area" in df.columns:
-            df["surface_area"] = df["land_area"]
-        if "bed_rooms" not in df.columns and "bed" in df.columns:
-            df["bed_rooms"] = df["bed"]
-        if "bed" not in df.columns and "bed_rooms" in df.columns:
-            df["bed"] = df["bed_rooms"]
-        if "bath_rooms" not in df.columns and "bath" in df.columns:
-            df["bath_rooms"] = df["bath"]
-        if "bath" not in df.columns and "bath_rooms" in df.columns:
-            df["bath"] = df["bath_rooms"]
-
-        df_clean = df.dropna(subset=["price", "city", "district", "land_area", "building_area"]).copy()
-        df_clean["price_per_sqm"] = df_clean["price"] / df_clean["land_area"]
-
-        # 4. SEED MASTER LOCATIONS (Dinamis dari Dataset)
-        locations_df = df_clean[["city", "district"]].drop_duplicates().sort_values(by=["city", "district"])
+        # 3. KOSONGKAN DATA DATASET, LOKASI & STATISTIK PASAR (Inisiasi Mandiri via Web Admin Upload)
         MasterLocation.query.delete()
-        for _, row in locations_df.iterrows():
-            c = str(row["city"]).strip()
-            d = str(row["district"]).strip()
-            if c and d:
-                db.session.add(MasterLocation(city=c, district=d, is_active=True))
-        db.session.commit()
-        print(f"  [OK] {len(locations_df)} Master Wilayah diekstrak dinamis dari dataset.")
-
-        # 5. SEED MARKET STATISTICS (Dihitung Dinamis dari Dataset)
         MarketStatistic.query.delete()
-
-        # a. Agregasi Level Kota (district = None)
-        city_stats = df_clean.groupby("city").agg(
-            avg_price=("price", "mean"),
-            avg_price_per_sqm=("price_per_sqm", "mean"),
-            avg_surface_area=("land_area", "mean"),
-            avg_building_area=("building_area", "mean"),
-            total_properties=("price", "count"),
-        ).reset_index()
-
-        for _, r in city_stats.iterrows():
-            db.session.add(MarketStatistic(
-                city=str(r["city"]).strip(),
-                district=None,
-                avg_price=round(float(r["avg_price"]), 2),
-                avg_price_per_sqm=round(float(r["avg_price_per_sqm"]), 2),
-                avg_surface_area=round(float(r["avg_surface_area"]), 2),
-                avg_building_area=round(float(r["avg_building_area"]), 2),
-                total_properties=int(r["total_properties"]),
-            ))
-
-        # b. Agregasi Level Kawasan / Kecamatan
-        district_stats = df_clean.groupby(["city", "district"]).agg(
-            avg_price=("price", "mean"),
-            avg_price_per_sqm=("price_per_sqm", "mean"),
-            avg_surface_area=("land_area", "mean"),
-            avg_building_area=("building_area", "mean"),
-            total_properties=("price", "count"),
-        ).reset_index()
-
-        for _, r in district_stats.iterrows():
-            db.session.add(MarketStatistic(
-                city=str(r["city"]).strip(),
-                district=str(r["district"]).strip(),
-                avg_price=round(float(r["avg_price"]), 2),
-                avg_price_per_sqm=round(float(r["avg_price_per_sqm"]), 2),
-                avg_surface_area=round(float(r["avg_surface_area"]), 2),
-                avg_building_area=round(float(r["avg_building_area"]), 2),
-                total_properties=int(r["total_properties"]),
-            ))
-
-        db.session.commit()
-        total_market_records = len(city_stats) + len(district_stats)
-        print(f"  [OK] {total_market_records} Statistik Pasar dihitung dinamis dari dataset.")
-
-        # 6. SEED DATASET METADATA (Metadata Aktual dari Berkas Disk)
         DatasetMetadata.query.delete()
-        file_size_bytes = os.path.getsize(dataset_path)
-        total_records = len(df)
-        file_name = os.path.basename(dataset_path)
-        
-        dataset = DatasetMetadata(
-            id=uuid.uuid4(),
-            file_name=file_name,
-            file_path=f"uploads/datasets/{file_name}",
-            total_records=total_records,
-            file_size_bytes=file_size_bytes,
-            uploaded_by=admin.id,
-            created_at=datetime.now(timezone.utc),
-        )
-        db.session.add(dataset)
         db.session.commit()
-        print(f"  [OK] Metadata dataset primer ({file_name}, {total_records:,} baris, {file_size_bytes:,} bytes) dicatat dinamis.")
+        print("  [OK] Tabel dataset, lokasi & statistik pasar dikosongkan untuk unggah mandiri di Web Admin.")
 
-        # 7. SEED ML MODELS (Metrik & Arsitektur Dibaca 100% Dinamis dari Berkas Model)
+        # 4. SEED ML MODELS (Metrik & Arsitektur Dibaca Dinamis dari Berkas Model)
         model_path = os.path.join(app.root_path, "..", "models_artefacts", "house_price_xgb_model.pkl")
         eval_path = os.path.join(app.root_path, "..", "models_artefacts", "hasil_xgb.pkl")
 
         if os.path.exists(eval_path) and os.path.exists(model_path):
-            # Baca 100% dinamis langsung dari berkas evaluasi hasil_xgb.pkl
             eval_data = joblib.load(eval_path)
             algorithm_type = eval_data.get("Model", "XGBoost Regressor")
             testing_metrics = eval_data.get("Testing", {})
@@ -191,7 +86,6 @@ def seed_database():
             mae_score = float(testing_metrics.get("Mean absolute error", 0.2230))
             rmse_score = float(testing_metrics.get("Root mean squared error", 0.3350))
 
-            # Baca 100% dinamis langsung dari arsitektur pipeline house_price_xgb_model.pkl
             loaded_model = joblib.load(model_path)
             if hasattr(loaded_model, "steps") and loaded_model.steps:
                 estimator_obj = loaded_model.steps[-1][1]
@@ -221,17 +115,18 @@ def seed_database():
         )
         db.session.add(active_model)
         db.session.commit()
-        print(f"  [OK] Registri model ML dibaca dinamis dari artefak ({model_name}, R2={r2_score:.4f}, MAE={mae_score:.4f}).")
+        print(f"  [OK] Registri model ML aktif ({model_name}, R2={r2_score:.4f}, MAE={mae_score:.4f}).")
 
-        # 8. PEMBERSIHAN TOTAL DATA DUMMY
+        # 5. PEMBERSIHAN DATA LOG & AKUN SEMENTARA
         PredictionLog.query.delete()
         Notification.query.delete()
         SystemAuditLog.query.delete()
         User.query.filter(User.email.notin_([u[0] for u in official_users])).delete()
         db.session.commit()
-        print("  [OK] Seluruh data dummy (logs, notifikasi, audit, akun pengujian sementara) telah bersih 100%.")
+        print("  [OK] Log prediksi, notifikasi, audit & akun sementara dibersihkan.")
 
-        print("\n*** SEEDING DINAMIS 100% SELESAI DENGAN SUKSES! ***\n")
+        print("\n*** INISIALISASI SEKTOR INTI BASIS DATA SELESAI! ***\n")
+
 
 if __name__ == "__main__":
     seed_database()
