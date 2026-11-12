@@ -15,14 +15,15 @@ Repositori ini memuat implementasi backend RESTful API, orkestrasi basis data Po
 ## 📌 Daftar Isi
 1. [Fitur Utama & Arsitektur](#-fitur-utama--arsitektur)
 2. [Prasyarat Sistem (Prerequisites)](#-prasyarat-sistem-prerequisites)
-3. [Panduan Instalasi & Menjalankan (Lokal)](#-panduan-instalasi--menjalankan-lokal)
-4. [Menjalankan via Docker Compose](#-menjalankan-via-docker-compose)
-5. [Kredensial Default Seeder](#-kredensial-default-seeder)
-6. [Daftar Endpoint RESTful API](#-daftar-endpoint-restful-api)
-7. [Otomasi Pengujian Mutu (Pytest)](#-otomasi-pengujian-mutu-pytest)
-8. [Handover Integrasi Model ML (.pkl)](#-handover-integrasi-model-ml-pkl)
-9. [Struktur Direktori Proyek](#-struktur-direktori-proyek)
-10. [Tim Pengembang](#-tim-pengembang)
+3. [Cara Cepat Menjalankan Proyek (Quick Start)](#-cara-cepat-menjalankan-proyek-quick-start)
+4. [Panduan Instalasi Awal (Setup dari Nol)](#-panduan-instalasi-awal-setup-dari-nol)
+5. [Menjalankan via Docker Compose](#-menjalankan-via-docker-compose)
+6. [Kredensial Default Seeder](#-kredensial-default-seeder)
+7. [Daftar Endpoint RESTful API](#-daftar-endpoint-restful-api)
+8. [Otomasi Pengujian Mutu (Pytest)](#-otomasi-pengujian-mutu-pytest)
+9. [Handover Integrasi Model ML (.pkl)](#-handover-integrasi-model-ml-pkl)
+10. [Struktur Direktori Proyek](#-struktur-direktori-proyek)
+11. [Tim Pengembang](#-tim-pengembang)
 
 ---
 
@@ -64,7 +65,38 @@ Sebelum menjalankan proyek, pastikan perangkat Anda telah terpasang:
 
 ---
 
-## 🛠 Panduan Instalasi & Menjalankan (Lokal)
+## ⚡ Cara Cepat Menjalankan Proyek (Quick Start)
+
+Gunakan 4 langkah praktis ini untuk menjalankan server sehari-hari jika Anda sudah pernah menyelesaikan instalasi awal:
+
+```powershell
+# 1. Pastikan aplikasi Docker Desktop sudah dibuka di Windows (Engine running)
+
+# 2. Nyalakan kontainer database PostgreSQL di background
+docker-compose up -d db
+
+# 3. Aktifkan virtual environment Python
+.\.venv\Scripts\Activate.ps1
+# (Atau: .\venv\Scripts\Activate.ps1 jika folder venv Anda bernama venv)
+
+# 4. Jalankan server backend Flask
+python run.py
+```
+
+Setelah server aktif di `http://127.0.0.1:5000`:
+* 🌐 **Web Admin Console:** Akses [http://localhost:5000/admin/login](http://localhost:5000/admin/login) (Kredensial: `admin_hanif` / `Admin@12345`).
+* 🩺 **Health Check API:** Akses [http://localhost:5000/health](http://localhost:5000/health) untuk memverifikasi kesiapan server dan database.
+
+> [!NOTE]
+> Jika database baru saja dibuat atau datanya kosong, jalankan migrasi dan seeder terlebih dahulu sebelum `python run.py`:
+> ```powershell
+> flask db upgrade
+> python seed.py
+> ```
+
+---
+
+## 🛠 Panduan Instalasi Awal (Setup dari Nol)
 
 ### Langkah 1: Kloning Repositori
 Kloning repositori ini beserta submodule dokumentasinya:
