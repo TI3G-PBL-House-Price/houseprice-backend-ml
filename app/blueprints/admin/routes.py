@@ -27,6 +27,7 @@ from app.models import (
     MasterLocation,
 )
 from app.services.ml_service import MLService
+from app.services.dataset_service import DatasetService
 
 admin_bp = Blueprint("admin", __name__, template_folder="../templates")
 
@@ -145,7 +146,7 @@ def dashboard():
     avg_latency = round(float(avg_latency_query), 1) if avg_latency_query else 118.0
 
     # FR-WEB-03: Pratinjau struktur tabular 10 baris pertama
-    preview_headers = ["city", "district", "surface_area", "building_area", "bed", "bath", "carport", "price"]
+    preview_headers = ["price", "bed", "bath", "carport", "surface_area", "building_area", "district", "city"]
     preview_rows = []
 
     # Cek ketersediaan file dataset aktual di disk
@@ -155,7 +156,6 @@ def dashboard():
             dataset.file_path,
             os.path.join(current_app.root_path, "..", dataset.file_path),
             os.path.join(current_app.root_path, "..", "uploads", "datasets", dataset.file_name),
-            os.path.join(current_app.root_path, "..", "uploads", "datasets", "jakarta_house.csv"),
         ]
         for p in possible_paths:
             if os.path.exists(p):
@@ -231,17 +231,9 @@ def upload_dataset():
         file.save(file_path)
         file_size_bytes = os.path.getsize(file_path)
 
-        # Hitung jumlah baris data valid (eksklusi header)
-        total_records = 0
-        with open(file_path, mode="r", encoding="utf-8", errors="ignore") as f:
-            reader = csv.reader(f)
-            header = next(reader, None)
-            for _ in reader:
-                total_records += 1
-
-        if total_records == 0:
-            flash("Berkas CSV kosong atau tidak memiliki baris data.", "danger")
-            return redirect(url_for("admin.dashboard"))
+        total_records, total_locations, total_market_records = (
+            DatasetService.sync_locations_and_stats_from_csv(file_path)
+        )
 
         admin_id = session.get("admin_id")
         admin_uuid = uuid.UUID(admin_id) if admin_id else Admin.query.first().id
@@ -249,7 +241,7 @@ def upload_dataset():
         new_dataset = DatasetMetadata(
             id=uuid.uuid4(),
             file_name=filename,
-            file_path=os.path.relpath(file_path, current_app.root_path),
+            file_path=f"uploads/datasets/{filename}",
             total_records=total_records,
             file_size_bytes=file_size_bytes,
             uploaded_by=admin_uuid,
@@ -263,7 +255,11 @@ def upload_dataset():
             admin_id=admin_uuid,
             action_type="DATASET_UPLOAD",
             module_name="DATASET_MANAGEMENT",
-            description=f"Mengunggah dataset properti baru '{filename}' ({total_records:,} baris, {file_size_bytes/1024:.1f} KB, Split {split_ratio})",
+            description=(
+                f"Mengunggah dataset properti baru '{filename}' "
+                f"({total_records:,} baris, {total_locations} wilayah, "
+                f"{total_market_records} statistik pasar, {file_size_bytes/1024:.1f} KB, Split {split_ratio})"
+            ),
             ip_address=request.remote_addr or "127.0.0.1",
             user_agent=request.user_agent.string if request.user_agent else "Browser",
             created_at=datetime.now(timezone.utc),
@@ -272,12 +268,20 @@ def upload_dataset():
         db.session.commit()
 
         flash(
-            f"Dataset '{filename}' berhasil diunggah ({total_records:,} baris data, {file_size_bytes/1024:.1f} KB) "
-            f"dengan rasio latih/uji {split_ratio}.",
+            f"Dataset '{filename}' berhasil diunggah ({total_records:,} baris data, "
+            f"{total_locations} wilayah, {total_market_records} statistik pasar, "
+            f"{file_size_bytes/1024:.1f} KB) dengan rasio latih/uji {split_ratio}.",
             "success",
         )
+    except ValueError as e:
+        db.session.rollback()
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        flash(str(e), "danger")
     except Exception as e:
         db.session.rollback()
+        if os.path.exists(file_path):
+            os.remove(file_path)
         flash(f"Gagal memproses unggahan dataset: {str(e)}", "danger")
 
     return redirect(url_for("admin.dashboard"))

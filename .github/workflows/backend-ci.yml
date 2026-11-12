@@ -7,8 +7,10 @@ on:
       - develop
     paths:
       - 'app/**'
+      - 'migrations/**'
       - 'models_artefacts/**'
       - 'tests/**'
+      - 'seed.py'
       - 'requirements.txt'
       - 'Dockerfile'
       - 'docker-compose.yml'
@@ -19,10 +21,13 @@ on:
       - develop
     paths:
       - 'app/**'
+      - 'migrations/**'
       - 'models_artefacts/**'
       - 'tests/**'
+      - 'seed.py'
       - 'requirements.txt'
       - 'Dockerfile'
+      - '.github/workflows/backend-ci.yml'
 
 jobs:
   backend-qa-validation:
@@ -40,7 +45,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U test_admin -d houseprice_test_db"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -49,10 +54,10 @@ jobs:
       - name: Checkout Kode Sumber
         uses: actions/checkout@v4
 
-      - name: Setup Lingkungan Python 3.11
+      - name: Setup Lingkungan Python 3.13
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.13'
           cache: 'pip'
 
       - name: Instalasi Pustaka & Dependensi Pengujian

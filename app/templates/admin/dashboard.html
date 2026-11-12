@@ -179,7 +179,7 @@
                 </div>
                 <div class="mt-2.5">
                     <div class="flex items-baseline space-x-2 font-mono">
-                        <span class="text-xl font-bold text-white">{{ "{:,}".format(dataset.total_records) if dataset else '10,000' }}</span>
+                        <span class="text-xl font-bold text-white">{{ "{:,}".format(dataset.total_records) if dataset else '0' }}</span>
                         <span class="text-xs text-zinc-400">baris</span>
                     </div>
                     <p class="text-[11px] text-zinc-400 mt-1.5 font-mono">
@@ -441,6 +441,12 @@
                             <td class="py-2.5 text-zinc-400">{{ stat.avg_building_area }} m²</td>
                             <td class="py-2.5 text-zinc-200 font-semibold">{{ stat.total_properties }} Unit</td>
                         </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="py-6 text-center text-zinc-500 italic text-xs">
+                                Belum ada statistik pasar. Unggah dataset CSV pada tab Dataset Manager untuk menginisiasi data wilayah &amp; pasar.
+                            </td>
+                        </tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -675,10 +681,10 @@
         new Chart(ctxPrice, {
             type: 'bar',
             data: {
-                labels: cityLabels.length ? cityLabels : ['JakPus', 'JakSel', 'JakUt', 'JakBar', 'JakTim'],
+                labels: cityLabels.length ? cityLabels : ['Belum Ada Data'],
                 datasets: [{
                     label: 'Rata-Rata Harga / m² (Juta Rp)',
-                    data: cityPrices.length ? cityPrices : [28.0, 24.5, 21.0, 18.5, 14.2],
+                    data: cityPrices.length ? cityPrices : [0],
                     backgroundColor: '#3b82f6',
                     borderRadius: 4,
                     barPercentage: 0.5
