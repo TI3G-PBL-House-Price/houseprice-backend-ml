@@ -4,6 +4,7 @@
 [![Flask](https://img.shields.io/badge/Flask-3.0.3-000000?style=flat&logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15_Alpine-336791?style=flat&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Scikit-Learn](https://img.shields.io/badge/scikit--learn-1.5.2-F7931E?style=flat&logo=scikitlearn&logoColor=white)](https://scikit-learn.org/)
+[![XGBoost](https://img.shields.io/badge/XGBoost-2.0+-2072AF?style=flat&logo=xgboost&logoColor=white)](https://xgboost.readthedocs.io/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
 [![Tests](https://img.shields.io/badge/Pytest-23_Passed-success?style=flat&logo=pytest&logoColor=white)](https://docs.pytest.org/)
 
@@ -36,16 +37,19 @@ Repositori ini memuat implementasi backend RESTful API, orkestrasi basis data Po
   - Model relasional lengkap dengan native UUID, *foreign key constraints*, *composite indexes*, *check constraints*, dan *partial unique index* (`idx_ml_models_active`).
   - Manajemen migrasi DDL otomatis menggunakan **Alembic** (`flask db upgrade`).
 * **ML Service Layer & Market Heuristics:**
-  - Pemuatan artefak biner pipeline Scikit-Learn (`models_artefacts/model.pkl`) dengan *in-memory caching*.
+  - Pemuatan artefak biner pipeline Scikit-Learn (`models_artefacts/house_price_xgb_model.pkl`) dengan *in-memory caching*.
   - Mekanisme *fallback* cerdas berbasis statistik rata-rata harga per meter persegi DKI Jakarta saat model biner belum dilatih.
   - Kalkulasi toleransi harga wajar ($\pm 10\%$) dan pencatatan latensi komputasi server ($< 1.500$ ms).
 * **Web Admin Engineering Console (`/admin`):**
   - Antarmuka modern bertema *Dark Zinc Engineering Console* dengan font *JetBrains Mono* + *Plus Jakarta Sans*.
   - Pemantauan 4 metrik KPI ($R^2$, MAE, Latensi server, Volume Dataset).
-  - 2 grafik interaktif Chart.js (komparasi model regresi & tarif harga pasar per $m^2$).
-  - *Live Inference Workbench* yang mencatat hasil pengujian ke tabel `prediction_logs`.
-  - Manajemen Unggah Dataset CSV (FR-WEB-03) dengan penentuan rasio *train-test split* dan pratinjau data tabular 10 baris pertama.
+  - 2 grafik interaktif Chart.js dinamis (akurasi model aktif terlatih & sebaran harga pasar per $m^2$ berbasis `MarketStatistic`).
+  - *Live Inference Workbench* dengan **Searchable Dropdown Kecamatan** (254 wilayah terfilter dinamis per kota) yang mencatat telemetri ke `prediction_logs`.
+  - Format waktu seluruh log telemetri dan audit tersinkronisasi otomatis ke **Waktu Indonesia Barat (WIB / UTC+7)**.
+  - Manajemen Unggah Dataset CSV (FR-WEB-03) dengan penentuan rasio *train-test split* dan pratinjau data tabular 10 baris pertama riil dari CSV.
   - Pengalihan model aktif produksi (*switch active model*) dan pencatatan jejak audit aktivitas ke `system_audit_logs`.
+* **Arsitektur 100% Bebas Data Dummy:**
+  - Seluruh data master wilayah (254 kecamatan), ringkasan statistik pasar (259 entitas), metadata dataset, dan model ML diambil secara murni dan dinamis dari berkas dataset asli (`jakarta_house.csv`) dan berkas model riil (`house_price_xgb_model.pkl` & `hasil_xgb.pkl`).
 * **Observabilitas & Pemantauan:**
   - Rute `/health` aktif memverifikasi *heartbeat* koneksi PostgreSQL secara riil.
 
@@ -107,7 +111,7 @@ DB_NAME=houseprice_db
 DB_USER=houseprice_admin
 DB_PASSWORD=houseprice_secret_pass
 
-MODEL_PATH=models_artefacts/model.pkl
+MODEL_PATH=models_artefacts/house_price_xgb_model.pkl
 ALLOWED_ORIGINS=*
 ```
 
@@ -118,17 +122,26 @@ docker-compose up -d db
 ```
 *(Atau pastikan service PostgreSQL lokal Anda aktif dengan kredensial yang sesuai di `.env`)*.
 
+> [!TIP]
+> **Menangani Bentrok Port 5432 (Jika Laptop Memiliki PostgreSQL Lokal):**
+> Jika di laptop Anda sudah terpasang PostgreSQL lokal (misal bawaan Windows, Laragon, atau pgAdmin yang sudah memakai port default `5432`), Anda tidak perlu mengubah kode repositori atau `docker-compose.yml`. Cukup sesuaikan parameter `DB_PORT` pada file lokal **`.env`** Anda ke port yang kosong (misal: `5434`):
+> ```ini
+> DB_PORT=5434
+> ```
+> Saat menjalankan `docker-compose up -d db`, Docker Compose secara dinamis membaca variabel `${DB_PORT:-5432}` dari file `.env` Anda sehingga port container otomatis terpetakan ke `5434:5432`. Anggota tim lain yang tidak mengalami bentrok tetap dapat menggunakan port default `5432` tanpa saling mengganggu, karena file `.env` bersifat rahasia dan diabaikan oleh Git (`.gitignore`).
+
 ### Langkah 6: Jalankan Migrasi Basis Data (Alembic)
 Terapkan skema 9 tabel relasional ke basis data PostgreSQL:
 ```powershell
 flask db upgrade
 ```
 
-### Langkah 7: Jalankan Seeder Basis Data
-Isi basis data dengan akun administrator, data master 46 lokasi wilayah DKI Jakarta, rata-rata pasar, metadata dataset, registri model ML, dan data sampel:
+### Langkah 7: Jalankan Seeder Basis Data (100% Dinamis)
+Inisialisasi basis data secara dinamis dari dataset asli dan model terlatih:
 ```powershell
 python seed.py
 ```
+*(Perintah ini mengekstrak 254 Master Wilayah riil, mengkalkulasi 259 ringkasan statistik pasar langsung dari `jakarta_house.csv`, membaca evaluasi model ML dari `hasil_xgb.pkl`, serta menginisialisasi akun resmi tanpa menyisakan data dummy).*
 
 ### Langkah 8: Jalankan Server Pengembangan Flask
 Mulai aplikasi backend:
@@ -166,13 +179,13 @@ Setelah menjalankan `python seed.py`, Anda dapat menggunakan akun bawaan berikut
 
 ### 1. Akun Web Admin Console (`http://localhost:5000/admin/login`)
 * **Username / Email:** `admin_hanif` atau `hanif@houseprice.id`
-* **Kata Sandi:** `Admin123!`
+* **Kata Sandi:** `Admin@12345`
 * *Tips:* Tersedia tombol cepat **"Isi Otomatis Kredensial Demo"** di halaman login admin untuk kemudahan demonstrasi.
 
 ### 2. Akun Pengguna Mobile (Untuk Testing Endpoint API)
 * **Akun 1:** `budi.santoso@gmail.com` / `Password123!`
-* **Akun 2:** `siti.aminah@yahoo.com` / `Password123!`
-* **Akun 3:** `ahmad.fauzi@outlook.com` / `Password123!`
+* **Akun 2:** `siti.rahma@gmail.com` / `Password123!`
+* **Akun 3:** `kevin.wijaya@gmail.com` / `Password123!`
 
 ---
 
@@ -199,7 +212,7 @@ Seluruh endpoint di bawah ini mengacu secara ketat pada kontrak spesifikasi Open
 ### 📍 3. Master Data & Market Statistics (`/api/v1`)
 | Method | Endpoint | Proteksi | Deskripsi |
 | :---: | :--- | :---: | :--- |
-| `GET` | `/api/v1/locations` | Publik | Data 46 kecamatan dikelompokkan ke dalam 5 kota administratif DKI Jakarta. |
+| `GET` | `/api/v1/locations` | Publik | Data 254 kecamatan riil dikelompokkan ke dalam 5 kota administratif DKI Jakarta. |
 | `GET` | `/api/v1/market-statistics` | Publik | Rata-rata harga pasar properti per $m^2$ dengan filter query parameter `?city=` dan `?district=`. |
 
 ### 🔔 4. In-App Notifications (`/api/v1/notifications`)
@@ -246,17 +259,14 @@ Tingkat Kelulusan: 100% LULUS (23 dari 23 skenario uji)
 
 Layer `MLService` pada `app/services/ml_service.py` telah dirancang bersifat modular dan *plug-and-play*:
 
-1. Selesaikan pelatihan model regresi terbaik pada repositori eksperimen `ml-model-testing` (misal: Random Forest dengan $R^2 \ge 80\%$).
-2. Simpan biner pipeline lengkap (beserta One-Hot Encoding dan Scaler):
-   ```python
-   import joblib
-   joblib.dump(best_pipeline, "model.pkl")
-   ```
-3. Letakkan berkas biner tersebut pada direktori:
+1. Model terbaik hasil eksperimen repositori `ml-model-testing` menggunakan algoritma **XGBoost Regressor (Tuned dengan GridSearchCV)** dengan performa testing $R^2 = 83{,}08\%$, MAE = $0{,}2230$, dan RMSE = $0{,}3350$.
+2. Pipeline biner model lengkap (termasuk *ColumnTransformer* One-Hot Encoding dan regressor XGBoost) tersimpan pada direktori:
    ```text
-   models_artefacts/model.pkl
+   models_artefacts/house_price_xgb_model.pkl
+   models_artefacts/hasil_xgb.pkl
    ```
-4. Saat aplikasi Flask dijalankan, `MLService` akan otomatis mendeteksi, memuat, dan menggunakan model `.pkl` tersebut untuk inferensi `POST /api/v1/predict` tanpa perubahan kode.
+3. Saat aplikasi Flask dijalankan, `MLService` otomatis mendeteksi dan memuat berkas biner tersebut. `MLService` juga secara cerdas mendeteksi skala logaritmik $\log(1 + \text{harga})$ dan melakukan konversi kembali ke nominal Rupiah asli menggunakan $\exp(y) - 1$ (`np.expm1`).
+4. Jika berkas model tidak ditemukan atau mengalami kendala masukan tak lazim, `MLService` secara otomatis beralih (*graceful fallback*) ke kalkulasi estimasi harga berbasis agregasi statistik pasar per meter persegi DKI Jakarta.
 
 ---
 
@@ -264,6 +274,9 @@ Layer `MLService` pada `app/services/ml_service.py` telah dirancang bersifat mod
 
 ```text
 houseprice-backend-ml/
+├── .github/                  # Konfigurasi otomasi CI/CD GitHub Actions
+│   └── workflows/
+│       └── backend-ci.yml    # Pipeline otomatis linter (flake8), database, & pytest
 ├── app/
 │   ├── blueprints/           # Modular route controllers
 │   │   ├── admin/            # Web Admin console (/admin)
@@ -280,7 +293,7 @@ houseprice-backend-ml/
 │   └── extensions.py         # Ekstensi SQLAlchemy, Bcrypt, Migrate, CORS
 ├── docs/                     # Submodule Git dokumentasi PBL (PRD, OpenAPI, dll)
 ├── migrations/               # Berkas migrasi DDL Alembic
-├── models_artefacts/         # Direktori penyimpanan biner model.pkl
+├── models_artefacts/         # Direktori penyimpanan biner model & evaluasi ML
 ├── tests/                    # Pytest automated test suites (23 test cases)
 ├── uploads/datasets/         # Direktori penyimpanan unggahan dataset CSV
 ├── .env.example              # Template variabel lingkungan publik

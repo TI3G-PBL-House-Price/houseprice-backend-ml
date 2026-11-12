@@ -1,0 +1,99 @@
+name: Backend ML & API CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'app/**'
+      - 'models_artefacts/**'
+      - 'tests/**'
+      - 'requirements.txt'
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - '.github/workflows/backend-ci.yml'
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'app/**'
+      - 'models_artefacts/**'
+      - 'tests/**'
+      - 'requirements.txt'
+      - 'Dockerfile'
+
+jobs:
+  backend-qa-validation:
+    name: Lint, Unit Test & Schema Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: houseprice_test_db
+          POSTGRES_USER: test_admin
+          POSTGRES_PASSWORD: test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Kode Sumber
+        uses: actions/checkout@v4
+
+      - name: Setup Lingkungan Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Instalasi Pustaka & Dependensi Pengujian
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 pytest pytest-cov
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Analisis Kualitas Kode (Flake8 Linter)
+        run: |
+          # Hentikan proses jika terdapat sintaks error atau variabel undefined
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Peringatan gaya penulisan kode standar PEP8 (non-blocking)
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
+
+      - name: Inisialisasi Skema & Seeder Basis Data
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: houseprice_test_db
+          DB_USER: test_admin
+          DB_PASSWORD: test_password
+          FLASK_APP: run.py
+        run: |
+          flask db upgrade
+          python seed.py
+
+      - name: Eksekusi Uji Otomatis & Cakupan Kode (Pytest)
+        env:
+          FLASK_ENV: testing
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: houseprice_test_db
+          DB_USER: test_admin
+          DB_PASSWORD: test_password
+          SECRET_KEY: test-secret-key-for-ci
+          FLASK_APP: run.py
+        run: |
+          pytest --verbose --cov=app tests/
+
+      - name: Validasi Pembuatan Gambar Docker (Docker Build Check)
+        run: |
+          docker build -t houseprice-backend:ci-check .
+

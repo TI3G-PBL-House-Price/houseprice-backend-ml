@@ -60,7 +60,7 @@
                         <span>API ONLINE</span>
                     </span>
                     <span class="text-zinc-700">|</span>
-                    <span class="text-zinc-400">Model: <strong class="text-zinc-200">{{ active_model.model_name if active_model else 'Random Forest' }} ({{ active_model.version if active_model else 'v1.0.0' }})</strong></span>
+                    <span class="text-zinc-400">Model: <strong class="text-zinc-200">{{ active_model.model_name if active_model else 'XGBRegressor (Tuned)' }} ({{ active_model.version if active_model else 'v1.0.0' }})</strong></span>
                     <span class="text-zinc-700">|</span>
                     <span class="text-zinc-400">DB: <span class="text-zinc-300">PostgreSQL 15</span></span>
                 </div>
@@ -133,7 +133,7 @@
                         <span class="text-xs text-zinc-400">({{ active_model.r2_score if active_model else '0.8272' }})</span>
                     </div>
                     <p class="text-[11px] text-zinc-400 mt-1.5 font-mono">
-                        Algoritma: {{ active_model.model_name if active_model else 'Random Forest' }}
+                        Algoritma: {{ active_model.model_name if active_model else 'XGBRegressor (Tuned)' }}
                     </p>
                 </div>
             </div>
@@ -240,7 +240,7 @@
             <form action="{{ url_for('admin.quick_predict') }}" method="POST" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 pt-1">
                 <div class="col-span-2">
                     <label class="block text-[11px] font-mono text-zinc-400 mb-1">Kota Administrasi</label>
-                    <select name="city" class="w-full text-xs bg-zinc-950 border border-zinc-700/80 rounded px-2.5 py-2 text-zinc-200 focus:outline-none focus:border-blue-500">
+                    <select name="city" id="citySelect" class="w-full text-xs bg-zinc-950 border border-zinc-700/80 rounded px-2.5 py-2 text-zinc-200 focus:outline-none focus:border-blue-500">
                         <option value="Jakarta Selatan" selected>Jakarta Selatan</option>
                         <option value="Jakarta Barat">Jakarta Barat</option>
                         <option value="Jakarta Pusat">Jakarta Pusat</option>
@@ -249,9 +249,29 @@
                     </select>
                 </div>
 
-                <div class="col-span-2">
-                    <label class="block text-[11px] font-mono text-zinc-400 mb-1">Kecamatan</label>
-                    <input type="text" name="district" value="Tebet" class="w-full text-xs bg-zinc-950 border border-zinc-700/80 rounded px-2.5 py-2 text-zinc-200 focus:outline-none focus:border-blue-500" required>
+                <div class="col-span-2 relative">
+                    <label class="block text-[11px] font-mono text-zinc-400 mb-1">Kecamatan (Bisa Dicari / Dropdown)</label>
+                    <div class="relative">
+                        <input type="text" 
+                               name="district" 
+                               id="districtInput" 
+                               value="Tebet" 
+                               autocomplete="off" 
+                               placeholder="Cari atau pilih kecamatan..." 
+                               class="w-full text-xs bg-zinc-950 border border-zinc-700/80 rounded px-2.5 py-2 pr-8 text-zinc-200 focus:outline-none focus:border-blue-500" 
+                               required>
+                        <button type="button" 
+                                id="districtToggleBtn" 
+                                class="absolute right-0 top-0 bottom-0 px-2.5 flex items-center text-zinc-500 hover:text-zinc-300 transition"
+                                title="Buka daftar kecamatan">
+                            <i class="fa-solid fa-chevron-down text-[10px] transition-transform duration-200" id="districtChevron"></i>
+                        </button>
+                    </div>
+                    <!-- Dropdown Options List -->
+                    <div id="districtDropdown" 
+                         class="hidden absolute left-0 right-0 top-full mt-1 max-h-56 overflow-y-auto bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl z-50 divide-y divide-zinc-800/60 font-sans text-xs">
+                        <!-- Diisi otomatis dari Master Location oleh JavaScript -->
+                    </div>
                 </div>
 
                 <div>
@@ -313,7 +333,7 @@
                 <table class="w-full text-left border-collapse text-xs">
                     <thead>
                         <tr class="text-[11px] uppercase text-zinc-400 border-b border-zinc-800 font-mono">
-                            <th class="pb-2.5 font-medium">Timestamp</th>
+                            <th class="pb-2.5 font-medium">Waktu (WIB)</th>
                             <th class="pb-2.5 font-medium">Wilayah</th>
                             <th class="pb-2.5 font-medium">Parameter Fisik</th>
                             <th class="pb-2.5 font-medium">Estimasi Model (Rp)</th>
@@ -325,7 +345,7 @@
                     <tbody class="divide-y divide-zinc-800/60 font-mono text-zinc-300">
                         {% for log in prediction_logs %}
                         <tr class="hover:bg-zinc-800/40 transition">
-                            <td class="py-2.5 text-zinc-400 text-[11px]">{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else '-' }}</td>
+                            <td class="py-2.5 text-zinc-400 text-[11px]">{{ log.created_at|wib }}</td>
                             <td class="py-2.5 font-sans">
                                 <span class="font-semibold text-zinc-200">{{ log.district }}</span>,
                                 <span class="text-zinc-400 text-[11px]">{{ log.city }}</span>
@@ -431,7 +451,7 @@
                 <table class="w-full text-left border-collapse text-xs">
                     <thead>
                         <tr class="text-[11px] uppercase text-zinc-400 border-b border-zinc-800 font-mono">
-                            <th class="pb-2.5 font-medium">Waktu</th>
+                            <th class="pb-2.5 font-medium">Waktu (WIB)</th>
                             <th class="pb-2.5 font-medium">Action Type</th>
                             <th class="pb-2.5 font-medium">Modul</th>
                             <th class="pb-2.5 font-medium">Deskripsi Operasi</th>
@@ -441,7 +461,7 @@
                     <tbody class="divide-y divide-zinc-800/60 font-mono text-zinc-300">
                         {% for audit in audit_logs %}
                         <tr class="hover:bg-zinc-800/40 transition">
-                            <td class="py-2.5 text-zinc-400 text-[11px]">{{ audit.created_at.strftime('%Y-%m-%d %H:%M:%S') if audit.created_at else '-' }}</td>
+                            <td class="py-2.5 text-zinc-400 text-[11px]">{{ audit.created_at|wib }}</td>
                             <td class="py-2.5">
                                 <span class="bg-zinc-800 border border-zinc-700 text-blue-400 px-1.5 py-0.5 rounded text-[10px]">{{ audit.action_type }}</span>
                             </td>
@@ -514,8 +534,8 @@
                                     <span class="text-blue-400 font-semibold block mt-1">{{ (dataset.file_size_bytes / 1024)|round(1) }} KB</span>
                                 </div>
                                 <div class="bg-zinc-900 p-3 rounded-lg border border-zinc-800/80">
-                                    <span class="text-zinc-500 text-[10px] block">WAKTU UNGGAH</span>
-                                    <span class="text-zinc-400 text-[11px] block mt-1">{{ dataset.created_at.strftime('%Y-%m-%d %H:%M') if dataset.created_at else '-' }}</span>
+                                    <span class="text-zinc-500 text-[10px] block">WAKTU UNGGAH (WIB)</span>
+                                    <span class="text-zinc-400 text-[11px] block mt-1">{{ dataset.created_at|wib('%Y-%m-%d %H:%M') }}</span>
                                 </div>
                             </div>
                             {% else %}
@@ -561,6 +581,10 @@
                                     <td class="py-2.5 px-2 text-[11px] {% if loop.last %}text-blue-400 font-bold{% endif %}">{{ cell }}</td>
                                     {% endfor %}
                                 </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="{{ preview_headers|length }}" class="py-6 text-center text-zinc-500 italic text-xs">Belum ada berkas dataset yang tersedia untuk ditampilkan.</td>
+                                </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -600,18 +624,22 @@
             activeBtn.classList.add('border-blue-500', 'text-blue-400', 'font-semibold');
         }
 
-        // CHART 1: Model Comparison
+        // CHART 1: Model Comparison (Dinamis dari Basis Data)
         const ctxModel = document.getElementById('modelChart').getContext('2d');
+        const modelLabels = [{% for m in models %}'{{ m.model_name }} ({{ m.version }})'{% if not loop.last %}, {% endif %}{% endfor %}];
+        const modelScores = [{% for m in models %}{{ (m.r2_score * 100)|round(2) }}{% if not loop.last %}, {% endif %}{% endfor %}];
+        const modelColors = [{% for m in models %}'{{ "#2563eb" if m.is_active else "#52525b" }}'{% if not loop.last %}, {% endif %}{% endfor %}];
+
         new Chart(ctxModel, {
             type: 'bar',
             data: {
-                labels: ['Random Forest v1.0.0', 'Multiple Linear Reg v0.9.0'],
+                labels: modelLabels.length ? modelLabels : ['{{ active_model.model_name if active_model else "XGBRegressor (Tuned)" }} ({{ active_model.version if active_model else "v1.0.0" }})'],
                 datasets: [{
                     label: 'Koefisien Determinasi R² (%)',
-                    data: [82.72, 68.40],
-                    backgroundColor: ['#2563eb', '#52525b'],
+                    data: modelScores.length ? modelScores : [{{ (active_model.r2_score * 100)|round(2) if active_model else 83.08 }}],
+                    backgroundColor: modelColors.length ? modelColors : ['#2563eb'],
                     borderRadius: 4,
-                    barPercentage: 0.45
+                    barPercentage: 0.35
                 }]
             },
             options: {
@@ -639,15 +667,18 @@
             }
         });
 
-        // CHART 2: Regional Property Price Distribution
+        // CHART 2: Regional Property Price Distribution (Dinamis dari MarketStatistic)
         const ctxPrice = document.getElementById('priceChart').getContext('2d');
+        const cityLabels = [{% for s in market_stats %}'{{ s.city }}'{% if not loop.last %}, {% endif %}{% endfor %}];
+        const cityPrices = [{% for s in market_stats %}{{ (s.avg_price_per_sqm / 1000000)|round(1) }}{% if not loop.last %}, {% endif %}{% endfor %}];
+
         new Chart(ctxPrice, {
             type: 'bar',
             data: {
-                labels: ['JakPus', 'JakSel', 'JakUt', 'JakBar', 'JakTim'],
+                labels: cityLabels.length ? cityLabels : ['JakPus', 'JakSel', 'JakUt', 'JakBar', 'JakTim'],
                 datasets: [{
                     label: 'Rata-Rata Harga / m² (Juta Rp)',
-                    data: [28.0, 24.5, 21.0, 18.5, 14.2],
+                    data: cityPrices.length ? cityPrices : [28.0, 24.5, 21.0, 18.5, 14.2],
                     backgroundColor: '#3b82f6',
                     borderRadius: 4,
                     barPercentage: 0.5
@@ -676,6 +707,111 @@
                 }
             }
         });
+        // SEARCHABLE DROPDOWN KECAMATAN BERBASIS MASTER LOCATION
+        const masterLocations = [
+            {% for loc in all_locations %}
+            { city: {{ loc.city|tojson }}, district: {{ loc.district|tojson }} }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ];
+
+        const citySelect = document.getElementById('citySelect');
+        const districtInput = document.getElementById('districtInput');
+        const districtToggleBtn = document.getElementById('districtToggleBtn');
+        const districtDropdown = document.getElementById('districtDropdown');
+        const districtChevron = document.getElementById('districtChevron');
+
+        function getDistrictsForCity(city) {
+            return masterLocations
+                .filter(l => l.city === city)
+                .map(l => l.district)
+                .filter((val, idx, self) => self.indexOf(val) === idx)
+                .sort();
+        }
+
+        function renderDistrictDropdown(filterText = '') {
+            if (!citySelect || !districtDropdown) return;
+            const selectedCity = citySelect.value;
+            let districts = getDistrictsForCity(selectedCity);
+
+            if (filterText.trim()) {
+                const query = filterText.toLowerCase();
+                districts = districts.filter(d => d.toLowerCase().includes(query));
+            }
+
+            districtDropdown.innerHTML = '';
+
+            if (districts.length === 0) {
+                const emptyItem = document.createElement('div');
+                emptyItem.className = 'px-3 py-2 text-zinc-500 italic text-[11px]';
+                emptyItem.textContent = 'Kecamatan tidak ditemukan';
+                districtDropdown.appendChild(emptyItem);
+                return;
+            }
+
+            districts.forEach(dist => {
+                const item = document.createElement('div');
+                item.className = 'px-3 py-2 cursor-pointer hover:bg-blue-600/20 hover:text-blue-300 text-zinc-200 text-xs transition flex items-center justify-between';
+                if (dist.toLowerCase() === districtInput.value.trim().toLowerCase()) {
+                    item.classList.add('bg-zinc-800', 'text-blue-400', 'font-semibold');
+                }
+                item.innerHTML = `<span>${dist}</span><span class="text-[10px] text-zinc-500 font-mono">${selectedCity}</span>`;
+                item.addEventListener('click', () => {
+                    districtInput.value = dist;
+                    closeDistrictDropdown();
+                });
+                districtDropdown.appendChild(item);
+            });
+        }
+
+        function openDistrictDropdown() {
+            if (!districtDropdown) return;
+            renderDistrictDropdown(districtInput.value === 'Tebet' ? '' : districtInput.value);
+            districtDropdown.classList.remove('hidden');
+            if (districtChevron) districtChevron.classList.add('rotate-180');
+        }
+
+        function closeDistrictDropdown() {
+            if (!districtDropdown) return;
+            districtDropdown.classList.add('hidden');
+            if (districtChevron) districtChevron.classList.remove('rotate-180');
+        }
+
+        if (districtInput && districtDropdown && citySelect) {
+            districtInput.addEventListener('focus', () => {
+                openDistrictDropdown();
+            });
+
+            districtInput.addEventListener('input', (e) => {
+                districtDropdown.classList.remove('hidden');
+                renderDistrictDropdown(e.target.value);
+            });
+
+            if (districtToggleBtn) {
+                districtToggleBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (districtDropdown.classList.contains('hidden')) {
+                        openDistrictDropdown();
+                        districtInput.focus();
+                    } else {
+                        closeDistrictDropdown();
+                    }
+                });
+            }
+
+            citySelect.addEventListener('change', () => {
+                const districts = getDistrictsForCity(citySelect.value);
+                if (districts.length > 0) {
+                    districtInput.value = districts.includes('Tebet') ? 'Tebet' : districts[0];
+                }
+                renderDistrictDropdown('');
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!districtInput.contains(e.target) && !districtDropdown.contains(e.target) && (!districtToggleBtn || !districtToggleBtn.contains(e.target))) {
+                    closeDistrictDropdown();
+                }
+            });
+        }
     </script>
 </body>
 </html>
