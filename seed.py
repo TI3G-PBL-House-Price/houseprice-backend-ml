@@ -21,10 +21,12 @@ from app.models import (
     Notification,
     SystemAuditLog,
 )
+from app.services.dataset_service import DatasetService
 
 
 def seed_database():
-    """Inisialisasi data sektor inti (admins, users, ml_models) tanpa dependensi file CSV."""
+    """Inisialisasi data sektor inti (admins, users, ml_models) dan sinkronisasi
+    dataset jakarta_house_v3 (dengan kolom NJOP) ke master_locations & market_statistics."""
     app = create_app()
     with app.app_context():
         print("[SEED] Memulai inisialisasi sektor inti basis data HousePrice...")
@@ -67,24 +69,66 @@ def seed_database():
         db.session.commit()
         print("  [OK] Akun user mobile resmi berhasil diverifikasi.")
 
-        # 3. KOSONGKAN DATA DATASET, LOKASI & STATISTIK PASAR (Inisiasi Mandiri via Web Admin Upload)
-        MasterLocation.query.delete()
-        MarketStatistic.query.delete()
+        # 3. SEED DATASET, LOKASI & STATISTIK PASAR dari jakarta_house_v3
+        # Dataset v3 sudah mengandung kolom njop/m2 yang akan disimpan ke master_locations
+        dataset_filename = "jakarta_house_v3.csv"
+        dataset_path = os.path.join(
+            app.root_path, "..", "uploads", "datasets", dataset_filename
+        )
+
         DatasetMetadata.query.delete()
         db.session.commit()
-        print("  [OK] Tabel dataset, lokasi & statistik pasar dikosongkan untuk unggah mandiri di Web Admin.")
 
-        # 4. SEED ML MODELS (Metrik & Arsitektur Dibaca Dinamis dari Berkas Model)
+        if os.path.exists(dataset_path):
+            try:
+                print(f"  [INFO] Mensinkronisasi dataset '{dataset_filename}' ke DB...")
+                total_records, total_locations, total_market_records = (
+                    DatasetService.sync_locations_and_stats_from_csv(dataset_path)
+                )
+
+                file_size_bytes = os.path.getsize(dataset_path)
+                new_dataset = DatasetMetadata(
+                    id=uuid.uuid4(),
+                    file_name=dataset_filename,
+                    file_path=f"uploads/datasets/{dataset_filename}",
+                    total_records=total_records,
+                    file_size_bytes=file_size_bytes,
+                    uploaded_by=admin.id,
+                    created_at=datetime.now(timezone.utc),
+                )
+                db.session.add(new_dataset)
+                db.session.commit()
+                print(
+                    f"  [OK] Dataset '{dataset_filename}' tersinkronisasi: "
+                    f"{total_records:,} baris, {total_locations} wilayah, "
+                    f"{total_market_records} statistik pasar, {file_size_bytes/1024:.1f} KB."
+                )
+            except Exception as e:
+                db.session.rollback()
+                print(f"  [WARN] Gagal mensinkronisasi dataset: {e}")
+                print("  [INFO] Tabel lokasi & statistik pasar dikosongkan — unggah via Web Admin.")
+        else:
+            MasterLocation.query.delete()
+            MarketStatistic.query.delete()
+            db.session.commit()
+            print(
+                f"  [WARN] File '{dataset_filename}' tidak ditemukan di uploads/datasets/. "
+                "Tabel lokasi & statistik pasar dikosongkan — unggah via Web Admin."
+            )
+
+        # 4. SEED ML MODELS (Metrik & Arsitektur Dibaca Dinamis dari Berkas Model v2)
         model_path = os.path.join(app.root_path, "..", "models_artefacts", "house_price_xgb_model.pkl")
         eval_path = os.path.join(app.root_path, "..", "models_artefacts", "hasil_xgb.pkl")
 
         if os.path.exists(eval_path) and os.path.exists(model_path):
             eval_data = joblib.load(eval_path)
-            algorithm_type = eval_data.get("Model", "XGBoost Regressor")
+            algorithm_type = eval_data.get("Model", "XGBoost + GridSearchCV")
             testing_metrics = eval_data.get("Testing", {})
-            r2_score = float(testing_metrics.get("R2", 0.8308))
-            mae_score = float(testing_metrics.get("Mean absolute error", 0.2230))
-            rmse_score = float(testing_metrics.get("Root mean squared error", 0.3350))
+            r2_score = float(testing_metrics.get("R2", 0.8893))
+            mae_score = float(testing_metrics.get("Mean absolute error", 0.2466))
+            rmse_score_val = testing_metrics.get("Root mean squared error", 0.3639)
+            # Tangani tipe numpy float64
+            rmse_score = float(rmse_score_val) if hasattr(rmse_score_val, '__float__') else float(rmse_score_val)
 
             loaded_model = joblib.load(model_path)
             if hasattr(loaded_model, "steps") and loaded_model.steps:
@@ -93,17 +137,17 @@ def seed_database():
             else:
                 model_name = f"{loaded_model.__class__.__name__} (Tuned)"
         else:
-            algorithm_type = "XGBoost Regressor"
+            algorithm_type = "XGBoost + GridSearchCV"
             model_name = "XGBRegressor (Tuned)"
-            r2_score = 0.8308
-            mae_score = 0.2230
-            rmse_score = 0.3350
+            r2_score = 0.8893
+            mae_score = 0.2466
+            rmse_score = 0.3639
 
         MLModel.query.delete()
         active_model = MLModel(
             id=uuid.uuid4(),
             model_name=model_name,
-            version="v1.0.0",
+            version="v2.0.0",
             model_file_path="models_artefacts/house_price_xgb_model.pkl",
             algorithm_type=algorithm_type,
             r2_score=round(r2_score, 4),
@@ -115,7 +159,10 @@ def seed_database():
         )
         db.session.add(active_model)
         db.session.commit()
-        print(f"  [OK] Registri model ML aktif ({model_name}, R2={r2_score:.4f}, MAE={mae_score:.4f}).")
+        print(
+            f"  [OK] Registri model ML aktif ({model_name} v2.0.0, "
+            f"R2={r2_score:.4f}, MAE={mae_score:.4f}, RMSE={rmse_score:.4f})."
+        )
 
         # 5. PEMBERSIHAN DATA LOG & AKUN SEMENTARA
         PredictionLog.query.delete()
