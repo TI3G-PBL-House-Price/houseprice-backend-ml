@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Masuk | HousePrice Web Admin</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 antialiased selection:bg-blue-600 selection:text-white">
+
+    <div class="sm:mx-auto sm:w-full sm:max-w-md px-4">
+        <!-- Logo & Header -->
+        <div class="flex items-center justify-center space-x-3 mb-6">
+            <div class="w-11 h-11 rounded-lg bg-zinc-900 border border-zinc-700/80 flex items-center justify-center text-blue-500 shadow-sm">
+                <i class="fa-solid fa-server text-xl"></i>
+            </div>
+            <div class="text-left">
+                <span class="text-xl font-bold tracking-tight text-white block">HousePrice <span class="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono border border-zinc-700">Admin</span></span>
+                <span class="text-xs text-zinc-400">PBL TI-3G Polinema</span>
+            </div>
+        </div>
+
+        <h1 class="text-center text-xl font-semibold tracking-tight text-zinc-200">
+            Masuk ke Portal Administrator
+        </h1>
+        <p class="mt-1 text-center text-xs text-zinc-400">
+            Sistem Pemantauan Model & Layanan Inferensi Cloud
+        </p>
+    </div>
+
+    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4">
+        <div class="bg-zinc-900/90 py-8 px-6 shadow-2xl rounded-2xl border border-zinc-800 sm:px-10">
+
+            <!-- Flash Alerts -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="mb-5 rounded-lg p-3.5 text-xs flex items-center space-x-2.5 border {% if category == 'success' %}bg-emerald-950/60 border-emerald-800 text-emerald-300{% elif category == 'info' %}bg-blue-950/60 border-blue-800 text-blue-300{% else %}bg-rose-950/60 border-rose-800 text-rose-300{% endif %}">
+                            <i class="fa-solid {% if category == 'success' %}fa-circle-check{% elif category == 'info' %}fa-circle-info{% else %}fa-circle-exclamation{% endif %} text-sm"></i>
+                            <span>{{ message }}</span>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <form class="space-y-5" action="{{ url_for('admin.login') }}" method="POST">
+                <div>
+                    <label for="identity" class="block text-xs font-medium text-zinc-300">
+                        Email atau Username
+                    </label>
+                    <div class="mt-1.5 relative">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500 text-xs">
+                            <i class="fa-solid fa-user"></i>
+                        </div>
+                        <input id="identity" name="identity" type="text" autocomplete="username" required
+                            placeholder="admin_hanif atau hanif@houseprice.id"
+                            class="block w-full pl-9 pr-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="password" class="block text-xs font-medium text-zinc-300">
+                        Kata Sandi
+                    </label>
+                    <div class="mt-1.5 relative">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500 text-xs">
+                            <i class="fa-solid fa-lock"></i>
+                        </div>
+                        <input id="password" name="password" type="password" autocomplete="current-password" required
+                            placeholder="••••••••"
+                            class="block w-full pl-9 pr-10 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition">
+                        <button type="button" onclick="togglePasswordVisibility()" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-zinc-500 hover:text-zinc-300 text-xs">
+                            <i id="eye-icon" class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <button type="submit"
+                        class="w-full flex justify-center items-center py-2.5 px-4 border border-blue-500/30 rounded-lg text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-zinc-900 focus:ring-blue-500 shadow-sm transition">
+                        <span>Masuk ke Dashboard</span>
+                        <i class="fa-solid fa-arrow-right ml-2 text-xs"></i>
+                    </button>
+                </div>
+            </form>
+
+            <!-- Quick Credential Helper for Presentation Demo -->
+            <div class="mt-6 pt-5 border-t border-zinc-800 text-center">
+                <p class="text-xs text-zinc-400 mb-2.5">Kredensial Akun Administrator:</p>
+                <button type="button" onclick="fillDemoCredentials()"
+                    class="w-full inline-flex items-center justify-center space-x-2 py-2 px-3 rounded-lg border border-zinc-700/80 bg-zinc-800/80 hover:bg-zinc-700/80 text-xs text-zinc-300 hover:text-white font-mono transition">
+                    <i class="fa-solid fa-wand-magic-sparkles text-blue-400 text-xs"></i>
+                    <span>Isi Otomatis Kredensial Demo</span>
+                </button>
+            </div>
+        </div>
+
+        <p class="text-center text-xs text-zinc-400 mt-6">
+            Strict Gate Authentication • PostgreSQL & Bcrypt 12 Rounds
+        </p>
+    </div>
+
+    <script>
+        function togglePasswordVisibility() {
+            const passInput = document.getElementById('password');
+            const eyeIcon = document.getElementById('eye-icon');
+            if (passInput.type === 'password') {
+                passInput.type = 'text';
+                eyeIcon.classList.remove('fa-eye');
+                eyeIcon.classList.add('fa-eye-slash');
+            } else {
+                passInput.type = 'password';
+                eyeIcon.classList.remove('fa-eye-slash');
+                eyeIcon.classList.add('fa-eye');
+            }
+        }
+
+        function fillDemoCredentials() {
+            document.getElementById('identity').value = 'admin_hanif';
+            document.getElementById('password').value = 'Admin123!';
+        }
+    </script>
+</body>
+</html>
+

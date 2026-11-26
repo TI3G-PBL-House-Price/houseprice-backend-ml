@@ -15,9 +15,14 @@ python-dotenv==1.0.1
 
 # Machine Learning Runtime & Data Processing (Dukungan Python 3.13)
 scikit-learn>=1.5.2
+xgboost>=2.0.0
 joblib>=1.4.0
 numpy>=2.1.0
 pandas>=2.2.3
 
 # Production Server WSGI (Khusus Deployment Container Linux)
 gunicorn>=22.0.0
+
+# Testing & Quality Assurance
+pytest>=8.0.0
+pytest-cov>=5.0.0

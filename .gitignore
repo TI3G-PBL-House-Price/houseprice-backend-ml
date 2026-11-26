@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
 
 # Lingkungan Virtual Python
 venv/
@@ -20,6 +21,12 @@ instance/
 # Basis Data Lokal & Log
 *.sqlite3
 *.log
+
+# Uploads Dataset
+uploads/*
+!uploads/datasets/
+uploads/datasets/*
+!uploads/datasets/.gitkeep
 
 # Deployment & IDE
 .vscode/

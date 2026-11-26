@@ -21,5 +21,5 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    MODEL_PATH = os.getenv("MODEL_PATH", "models_artefacts/model.pkl")
+    MODEL_PATH = os.getenv("MODEL_PATH", "models_artefacts/house_price_xgb_model.pkl")
     ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
