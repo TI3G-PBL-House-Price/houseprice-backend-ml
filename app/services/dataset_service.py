@@ -29,8 +29,13 @@ class DatasetService:
     @classmethod
     def sync_locations_and_stats_from_csv(cls, file_path: str) -> tuple[int, int, int]:
         """
-        Membaca CSV properti, memvalidasi kolom wajib, lalu menyinkronkan tabel
-        `master_locations` dan `market_statistics` di PostgreSQL.
+        Membaca CSV properti (jakarta_house_v3 atau format sebelumnya), memvalidasi
+        kolom wajib, lalu menyinkronkan tabel `master_locations` (termasuk kolom
+        njop_per_m2 jika tersedia) dan `market_statistics` di PostgreSQL.
+
+        Dataset jakarta_house_v3 memuat kolom tambahan 'njop/m2' yang merupakan
+        median NJOP per m² per kecamatan. Nilai ini disimpan di master_locations
+        untuk digunakan oleh ml_service saat inferensi berlangsung.
 
         Returns:
             Tuple (total_rows, total_locations, total_market_records)
@@ -53,6 +58,11 @@ class DatasetService:
 
         for num_col in ("price", "surface_area", "building_area"):
             df[num_col] = pd.to_numeric(df[num_col], errors="coerce")
+
+        # Deteksi kolom NJOP (opsional, hadir di jakarta_house_v3)
+        has_njop = "njop/m2" in df.columns
+        if has_njop:
+            df["njop/m2"] = pd.to_numeric(df["njop/m2"], errors="coerce")
 
         df["city"] = df["city"].astype(str).str.strip().str.slice(0, 50)
         df["district"] = df["district"].astype(str).str.strip().str.slice(0, 50)
@@ -77,7 +87,20 @@ class DatasetService:
 
         df_clean["price_per_sqm"] = df_clean["price"] / df_clean["surface_area"]
 
-        # Sinkronisasi master_locations
+        # --- Sinkronisasi master_locations ---
+        # Hitung median njop/m2 per kombinasi city+district dari baris yang valid
+        njop_map: dict[tuple[str, str], float | None] = {}
+        if has_njop:
+            df_njop_valid = df_clean[df_clean["njop/m2"].notna()].copy()
+            if not df_njop_valid.empty:
+                njop_agg = (
+                    df_njop_valid
+                    .groupby(["city", "district"], as_index=False)["njop/m2"]
+                    .median()
+                )
+                for _, row in njop_agg.iterrows():
+                    njop_map[(row["city"], row["district"])] = float(row["njop/m2"])
+
         locations_df = (
             df_clean[["city", "district"]]
             .drop_duplicates()
@@ -85,15 +108,17 @@ class DatasetService:
         )
         MasterLocation.query.delete()
         for _, row in locations_df.iterrows():
+            njop_val = njop_map.get((row["city"], row["district"]))
             db.session.add(
                 MasterLocation(
                     city=row["city"],
                     district=row["district"],
+                    njop_per_m2=round(njop_val, 2) if njop_val is not None else None,
                     is_active=True,
                 )
             )
 
-        # Sinkronisasi market_statistics (agregasi level kota & kecamatan)
+        # --- Sinkronisasi market_statistics (agregasi kota & kecamatan) ---
         MarketStatistic.query.delete()
         city_stats = df_clean.groupby("city", as_index=False).agg(
             avg_price=("price", "mean"),
@@ -138,4 +163,3 @@ class DatasetService:
         total_locations = int(len(locations_df))
         total_market_records = int(len(city_stats) + len(district_stats))
         return total_rows, total_locations, total_market_records
-

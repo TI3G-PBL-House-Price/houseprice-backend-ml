@@ -7,6 +7,8 @@ class MasterLocation(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     city = db.Column(db.String(50), nullable=False, index=True)
     district = db.Column(db.String(50), nullable=False)
+    njop_per_m2 = db.Column(db.Numeric(18, 2), nullable=True,
+                             comment="Median NJOP per m2 (Rupiah) berdasarkan data NJOP Jakarta")
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.utcnow, nullable=False)
 

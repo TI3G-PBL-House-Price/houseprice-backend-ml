@@ -16,23 +16,30 @@ def get_locations():
             .all()
         )
 
-        # Kelompokkan kecamatan berdasarkan kota
-        grouped_locations = {}
+        # Kelompokkan kecamatan berdasarkan kota, sertakan njop_per_m2 untuk setiap kecamatan
+        grouped_locations: dict[str, list] = {}
+        njop_map: dict[str, dict] = {}  # city -> {district: njop_per_m2}
         for loc in locations:
             city_name = loc.city.strip()
             district_name = loc.district.strip()
 
             if city_name not in grouped_locations:
                 grouped_locations[city_name] = []
+                njop_map[city_name] = {}
 
             if district_name and district_name not in grouped_locations[city_name]:
                 grouped_locations[city_name].append(district_name)
+                njop_map[city_name][district_name] = (
+                    float(loc.njop_per_m2) if loc.njop_per_m2 is not None else None
+                )
 
         # Susun payload data sesuai spesifikasi OpenAPI LocationsResponse
+        # njop_per_m2 disertakan per kecamatan untuk keperluan backend inferensi
         data_payload = [
             {
                 "city": city,
-                "districts": districts
+                "districts": districts,
+                "njop_per_m2": njop_map.get(city, {})
             }
             for city, districts in grouped_locations.items()
         ]
